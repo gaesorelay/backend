@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:alpine
+    container_name: dog-sound-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass "my-secret-password" # 개발용 비밀번호 설정
+    volumes:
+      - ./redis_data:/data
