@@ -1,17 +1,17 @@
-import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config'; // 추가
+﻿import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { RedisModule } from './redis/redis.module'; // 추가
+import { RoomsModule } from './modules/rooms/rooms.module';
+import { RedisModule } from './redis/redis.module';
 
 @Module({
   imports: [
-    // 1. 환경변수 모듈 설정 (isGlobal: true로 해야 전체에서 접근 가능)
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    // 2. 우리가 만든 Redis 모듈 등록
-    RedisModule, 
+    RedisModule,
+    RoomsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
