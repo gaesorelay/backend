@@ -1,0 +1,60 @@
+services:
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - api
+    networks:
+      - app_net
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/api/Dockerfile
+    container_name: api
+    environment:
+      NODE_ENV: production
+      PORT: 8000
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    expose:
+      - "8000"
+    depends_on:
+      - redis
+    networks:
+      - app_net
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    networks:
+      - app_net
+    restart: unless-stopped
+
+  jenkins:
+    build:
+      context: .
+      dockerfile: ./jenkins/Dockerfile
+    container_name: jenkins
+    user: root
+    networks:
+      - app_net
+    volumes:
+      - jenkins_data:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+networks:
+  app_net:
+    driver: bridge
+
+volumes:
+  jenkins_data:

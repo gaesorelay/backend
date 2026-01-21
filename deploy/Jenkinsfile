@@ -1,0 +1,136 @@
+pipeline {
+  agent none
+
+  environment {
+    DOCKER_REGISTRY = "registry.gitlab.com"
+    IMAGE_NAME = "${DOCKER_REGISTRY}/gaesorelay/backend/api"
+
+    // Jenkins Credentials ID
+    REGISTRY_CREDENTIAL_ID   = "gitlab-docker-auth"     // Username/Password (GitLab Deploy Token)
+    DEPLOY_SSH_CREDENTIAL_ID = "deploy-server-ssh"      // SSH Username with private key
+
+    // 서버 유저/경로
+    DEPLOY_USER = "ubuntu"
+    DEPLOY_DIR  = "/home/${DEPLOY_USER}/gaesorelay/backend/deploy"
+  }
+
+  stages {
+
+    stage('CI: Build & Test') {
+      when {
+        anyOf {
+          // develop 브랜치 자체 빌드(머지 후 검증)
+          branch 'develop'
+
+          // MR 빌드 중 target이 develop인 것만
+          expression { return env.CHANGE_ID && env.CHANGE_TARGET == 'develop' }
+        }
+      }
+      agent {
+        docker {
+          image 'node:20-alpine'
+          args '-u root'
+        }
+      }
+      steps {
+        checkout scm
+
+        script {
+          // checkout 이후에 커밋 기반 태그 생성
+          env.TAG = "sha-${env.GIT_COMMIT.take(7)}"
+          echo "TAG=${env.TAG}"
+          echo "CHANGE_ID=${env.CHANGE_ID}, CHANGE_TARGET=${env.CHANGE_TARGET}, BRANCH_NAME=${env.BRANCH_NAME}"
+        }
+
+        sh 'npm ci'
+        sh 'npm test'
+        sh 'npm run build'
+
+        // CD 단계에서 docker build할 수 있게 워크스페이스 전달
+        stash name: 'ws', includes: '**/*', useDefaultExcludes: false
+      }
+    }
+
+    stage('CD: Image & Deploy') {
+      // develop 브랜치에 머지/푸시된 경우만 배포
+      when {
+        allOf {
+          branch 'develop'
+          expression { return !env.CHANGE_ID } // MR 빌드에서는 배포 금지
+        }
+      }
+      agent any
+
+      stages {
+
+        stage('Prepare Workspace') {
+          steps {
+            deleteDir()
+            unstash 'ws'
+            script {
+              // 혹시 CI 스테이지가 스킵되어 TAG가 없을 때 대비
+              if (!env.TAG) {
+                // checkout이 안되어있을 수 있으니 한번 보장
+                if (!env.GIT_COMMIT) {
+                  checkout scm
+                }
+                env.TAG = "sha-${env.GIT_COMMIT.take(7)}"
+              }
+              echo "Deploy TAG=${env.TAG}"
+            }
+          }
+        }
+
+        stage('Build & Push Docker Image') {
+          steps {
+            script {
+              docker.withRegistry("https://${DOCKER_REGISTRY}", "${REGISTRY_CREDENTIAL_ID}") {
+                def img = docker.build("${IMAGE_NAME}:${env.TAG}", "-f deploy/api/Dockerfile .")
+                img.push()
+                img.push("latest")
+              }
+            }
+          }
+        }
+
+        stage('Deploy (pull & run on EC2)') {
+          steps {
+            sshagent(credentials: ["${DEPLOY_SSH_CREDENTIAL_ID}"]) {
+              withCredentials([
+                usernamePassword(
+                  credentialsId: "${REGISTRY_CREDENTIAL_ID}",
+                  usernameVariable: 'REG_USER',
+                  passwordVariable: 'REG_PASS'
+                ),
+                string(
+                  credentialsId: 'deploy-server-ip',
+                  variable: 'DEPLOY_SERVER_IP'
+                )
+              ]) {
+                sh """
+                  set -e
+
+                  ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_SERVER_IP} 'mkdir -p ${DEPLOY_DIR}'
+
+                  scp -o StrictHostKeyChecking=no deploy/docker-compose.yml ${DEPLOY_USER}@${DEPLOY_SERVER_IP}:${DEPLOY_DIR}/docker-compose.yml
+
+                  ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_SERVER_IP} '
+                    set -e
+                    cd ${DEPLOY_DIR}
+
+                    echo "${REG_PASS}" | docker login ${DOCKER_REGISTRY} -u "${REG_USER}" --password-stdin
+
+                    IMAGE_NAME="${IMAGE_NAME}" TAG="${env.TAG}" docker compose pull api
+                    IMAGE_NAME="${IMAGE_NAME}" TAG="${env.TAG}" docker compose up -d --no-deps api
+
+                    docker image prune -f
+                  '
+                """
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
