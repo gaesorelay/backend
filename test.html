@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>개소릴레이 소켓 테스트</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  </head>
+  <body>
+    <h1>🐶 개소릴레이 소켓 테스트</h1>
+    <p>상태: <span id="status">연결 대기중...</span></p>
+    <button onclick="sendMessage()">메시지 보내기</button>
+    <ul id="messages"></ul>
+
+    <script>
+      // 네임스페이스 '/game'으로 연결
+      const socket = io('http://localhost:3000/game');
+
+      const statusSpan = document.getElementById('status');
+      const messagesList = document.getElementById('messages');
+
+      // 1. 연결 성공 시
+      socket.on('connect', () => {
+        statusSpan.innerText = '연결 성공! 🟢 (ID: ' + socket.id + ')';
+        statusSpan.style.color = 'green';
+      });
+
+      // 2. 환영 메시지 수신
+      socket.on('welcome', (msg) => {
+        addMessage('서버: ' + msg);
+      });
+
+      // 3. 테스트 응답 수신
+      socket.on('test_response', (msg) => {
+        addMessage('서버 응답: ' + msg);
+      });
+
+      // 4. 연결 끊김
+      socket.on('disconnect', () => {
+        statusSpan.innerText = '연결 끊김 🔴';
+        statusSpan.style.color = 'red';
+      });
+
+      function sendMessage() {
+        socket.emit('test_message', '멍멍! (테스트 메시지)');
+        addMessage('나: 멍멍! (테스트 메시지)');
+      }
+
+      function addMessage(text) {
+        const li = document.createElement('li');
+        li.innerText = text;
+        messagesList.appendChild(li);
+      }
+    </script>
+  </body>
+</html>
