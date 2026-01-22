@@ -1,54 +1,77 @@
 import {
   WebSocketGateway,
   WebSocketServer,
-  OnGatewayInit,
-  OnGatewayConnection,
-  OnGatewayDisconnect,
   SubscribeMessage,
   MessageBody,
   ConnectedSocket,
+  OnGatewayInit,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
-import { RoomsService } from '../modules/rooms/rooms.service';
+import { RoomsService } from '../modules/rooms/rooms.service'; // Service import 필수
+import { User } from '../common/types/user.type'; // User 타입 import
 
 @WebSocketGateway({
+  namespace: 'game', // 네임스페이스 확인
   cors: {
-    origin: '*', // 개발 단계에서는 누구나 접속 허용 (배포 시 프론트엔드 주소로 변경 필요)
-    methods: ['GET', 'POST'],
+    origin: '*', // CORS 허용
     credentials: true,
   },
-  namespace: 'game', // 소켓 엔드포인트: localhost:3000/game
 })
-export class EventsGateway
-  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
-{
-  @WebSocketServer() server: Server; // 소켓 서버 인스턴스 (메시지 전체 전송용)
+export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
+  @WebSocketServer() server: Server;
   private logger: Logger = new Logger('EventsGateway');
 
-  // 1. 초기화 시 실행
+  // ⭐️ [핵심] RoomsService 주입!
+  // 이제 Gateway가 Service의 함수(joinRoom 등)를 쓸 수 있게 됩니다.
+  constructor(private readonly roomsService: RoomsService) {}
+
   afterInit(server: Server) {
-    this.logger.log('웹소켓 서버 초기화 완료 🚀');
+    this.logger.log('✅ Socket Gateway Initialized');
   }
 
-  // 2. 클라이언트 연결 시 실행
   handleConnection(client: Socket) {
     this.logger.log(`Client Connected : ${client.id}`);
-
-    // (옵션) 클라이언트에게 환영 메시지 보내보기
-    client.emit('welcome', '개소릴레이 서버에 오신 것을 환영합니다!');
   }
 
-  // 3. 클라이언트 연결 해제 시 실행
   handleDisconnect(client: Socket) {
     this.logger.log(`Client Disconnected : ${client.id}`);
+    // 나중에 여기에 "연결 끊김 처리(방 나가기)" 로직도 추가해야 함
   }
 
-  // 4. 테스트용 메시지 수신 핸들러
-  @SubscribeMessage('test_message')
-  handleTestMessage(client: Socket, payload: string) {
-    this.logger.log(`받은 메시지: ${payload}`);
-    // 보낸 사람에게만 응답
-    client.emit('test_response', `서버에서 응답함: ${payload}`);
+  // 👇 [핵심] 클라이언트의 'join_room' 요청을 받는 핸들러
+  @SubscribeMessage('join_room')
+  async handleJoinRoom(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { roomId: string; nickname: string },
+  ) {
+    this.logger.log(`🔍 join_room 요청: 방=${data.roomId}, 닉네임=${data.nickname}`);
+
+    try {
+      // 1. 비즈니스 로직 실행 (Redis에 유저 저장)
+      // Service의 joinRoom 함수가 User 객체를 리턴한다고 가정
+      const user: User = await this.roomsService.joinRoom(data.roomId, data.nickname, client.id);
+
+      // 2. 소켓을 해당 방 채널(Room)에 실제로 접속시킴
+      // 이게 되어야 server.to(roomId).emit()을 했을 때 메시지를 받을 수 있음
+      client.join(data.roomId);
+      this.logger.log(`✅ 소켓 룸 입장 완료: ${client.id} -> ${data.roomId}`);
+
+      // 3. [방송] 방에 있는 다른 사람들에게 "새 유저가 왔다"고 알림
+      client.to(data.roomId).emit('user_joined', {
+        nickname: user.nickname,
+        role: user.role,
+        avatarId: user.avatarId, // 아바타 정보도 보내주면 좋음
+      });
+
+      // 4. [응답] 요청을 보낸 본인에게 성공 메시지와 내 정보 반환
+      return { status: 'success', data: user };
+    } catch (error) {
+      this.logger.error(`❌ 입장 실패: ${error.message}`);
+      // 에러가 나면 클라이언트에게 실패 이유를 알려줌
+      return { status: 'error', message: error.message };
+    }
   }
 }

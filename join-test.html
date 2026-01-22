@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <title>🐶 개소릴레이 입장 테스트</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+      body {
+        font-family: sans-serif;
+        padding: 20px;
+      }
+      .log-box {
+        background: #f0f0f0;
+        padding: 10px;
+        height: 300px;
+        overflow-y: scroll;
+        border: 1px solid #ccc;
+      }
+      .control-box {
+        margin-bottom: 20px;
+        padding: 10px;
+        border: 1px solid #ddd;
+        background: #fffbe6;
+      }
+      input {
+        padding: 5px;
+        margin-right: 5px;
+      }
+      button {
+        padding: 5px 10px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🐶 방 입장(Join Room) 테스트</h1>
+
+    <div class="control-box">
+      <h3>1. 입장 정보 입력</h3>
+      <label>방 UUID:</label>
+      <input type="text" id="roomIdInput" value="test-room-1" />
+      <br /><br />
+      <label>닉네임:</label>
+      <input type="text" id="nicknameInput" value="테스트유저1" />
+      <button onclick="joinRoom()">🚪 입장하기</button>
+    </div>
+
+    <div class="log-box">
+      <h3>📜 이벤트 로그</h3>
+      <ul id="messages"></ul>
+    </div>
+
+    <script>
+      // 네임스페이스 '/game'으로 연결
+      const socket = io('http://localhost:8000/game');
+      const messagesList = document.getElementById('messages');
+
+      // 1. 소켓 연결 확인
+      socket.on('connect', () => {
+        log(`✅ 서버 연결 성공! (Socket ID: ${socket.id})`, 'green');
+      });
+
+      // 2. 다른 유저가 들어왔을 때 알림 (Broadcast 수신)
+      socket.on('user_joined', (data) => {
+        log(`📢 [방송] 새 유저 입장: ${data.nickname} (${data.role})`, 'blue');
+      });
+
+      // 3. 입장 요청 함수
+      function joinRoom() {
+        const roomId = document.getElementById('roomIdInput').value;
+        const nickname = document.getElementById('nicknameInput').value;
+
+        log(`📤 입장 요청 보냄 (방: ${roomId}, 닉네임: ${nickname})`, 'black');
+
+        // 서버로 'join_room' 이벤트 전송 (응답 받을 콜백 포함)
+        socket.emit('join_room', { roomId, nickname }, (response) => {
+          console.log('서버 응답:', response);
+
+          if (response.status === 'success') {
+            const user = response.data;
+            log(`🎉 입장 성공! 역할: ${user.role}, 팀: ${user.team}`, 'green');
+            log(`   - 내 토큰: ${user.userToken}`);
+          } else {
+            log(`❌ 입장 실패: ${response.message}`, 'red');
+          }
+        });
+      }
+
+      function log(text, color) {
+        const li = document.createElement('li');
+        li.innerText = text;
+        li.style.color = color || 'black';
+        messagesList.prepend(li); // 최신 로그가 위로
+      }
+    </script>
+  </body>
+</html>
