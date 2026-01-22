@@ -45,8 +45,12 @@ services:
     user: root
     networks:
       - app_net
+    environment:
+      - TZ=Asia/Seoul
     volumes:
       - jenkins_data:/var/jenkins_home
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
       - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
 
