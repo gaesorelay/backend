@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, Get, Param } from '@nestjs/common';
 // 타입으로만 사용되기 때문에 import type 사용
 import type { CreateRoomDto } from './dto/create-room.dto';
 import type { CreateRoomResponseDto } from './dto/create-room.response.dto';
@@ -11,5 +11,15 @@ export class RoomsController {
   @Post()
   createRoom(@Body() body: CreateRoomDto): Promise<CreateRoomResponseDto> {
     return this.roomsService.createRoom(body);
+  }
+
+  // 방 정보 조회 API
+  @Get(':roomUuid')
+  async getRoom(@Param('roomUuid') roomUuid: string) {
+    const roomInfo = await this.roomsService.getRoomInfo(roomUuid);
+    return {
+      status: 'success',
+      data: roomInfo,
+    };
   }
 }
