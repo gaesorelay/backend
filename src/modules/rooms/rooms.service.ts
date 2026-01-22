@@ -77,4 +77,22 @@ export class RoomsService {
 
     return newUser;
   }
+
+  async getRoomInfo(roomUuid: string) {
+    // 1. 방 정보 가져오기
+    const room = await this.roomsRepository.findById(roomUuid);
+    if (!room) {
+      throw new NotFoundException('존재하지 않는 방입니다.');
+    }
+
+    // 2. 현재 인원 수 실시간 조회
+    const currentCount = await this.roomsRepository.getUserCount(roomUuid);
+
+    // 3. 필요한 정보만 추려서 리턴 (비밀번호 같은 게 있다면 제외)
+    return {
+      ...room,
+      currentUserCount: currentCount,
+      // config 정보 등을 풀어서 줘도 좋음
+    };
+  }
 }
