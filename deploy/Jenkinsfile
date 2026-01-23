@@ -73,7 +73,7 @@ pipeline {
           steps {
             script {
               docker.withRegistry("", "${REGISTRY_CREDENTIAL_ID}") {
-                def img = docker.build("${IMAGE_NAME}:${env.TAG}", "-f deploy/api/Dockerfile .")
+                def img = docker.build("${IMAGE_NAME}:${env.TAG}", "-f deploy/backend/Dockerfile .")
                 img.push()
                 img.push("latest")
               }
