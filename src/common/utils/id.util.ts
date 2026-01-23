@@ -12,4 +12,4 @@ export const generateRoomId = (length = 6): string => {
   return result;
 };
 
-export const generateOwnerToken = (): string => randomUUID();
+export const generateUUIDToken = (): string => randomUUID();

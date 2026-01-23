@@ -57,6 +57,9 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
       // 2. 소켓을 해당 방 채널(Room)에 실제로 접속시킴
       // 이게 되어야 server.to(roomId).emit()을 했을 때 메시지를 받을 수 있음
       client.join(data.roomId);
+      this.logger.log(
+        `join_room token: ${user.userToken} (room: ${data.roomId}, nickname: ${user.nickname})`,
+      );
       this.logger.log(`✅ 소켓 룸 입장 완료: ${client.id} -> ${data.roomId}`);
 
       // 3. [방송] 방에 있는 다른 사람들에게 "새 유저가 왔다"고 알림
