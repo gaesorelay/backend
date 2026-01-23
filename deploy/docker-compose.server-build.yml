@@ -3,29 +3,40 @@ services:
     image: nginx:1.25-alpine
     container_name: nginx
     ports:
-      - "80:80"
-      - "443:443"
+      - '80:80'
+      - '443:443'
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
-      - api
+      - backend
     networks:
       - app_net
     restart: unless-stopped
 
-  api:
+  frontend:
+    build:
+      context: ../../frontend
+      dockerfile: deploy/Dockerfile
+    container_name: frontend
+    expose:
+      - '80'
+    networks:
+      - app_net
+    restart: unless-stopped
+
+  backend:
     build:
       context: ..
-      dockerfile: deploy/api/Dockerfile
-    container_name: api
+      dockerfile: deploy/backend/Dockerfile
+    container_name: backend
     environment:
       NODE_ENV: production
       PORT: 8000
       REDIS_HOST: redis
       REDIS_PORT: 6379
     expose:
-      - "8000"
+      - '8000'
     depends_on:
       - redis
     networks:

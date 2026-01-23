@@ -10,6 +10,8 @@ async function bootstrap() {
     credentials: true, // 쿠키/인증 헤더 허용
   });
 
+  app.setGlobalPrefix('api');
+
   await app.listen(process.env.PORT ?? 8000, '0.0.0.0');
   console.log(`Application is running on: ${await app.getUrl()}`);
 }

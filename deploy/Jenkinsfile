@@ -108,8 +108,8 @@ pipeline {
 
                     echo "${REG_PASS}" | docker login docker.io -u "${REG_USER}" --password-stdin
 
-                    IMAGE_NAME="${IMAGE_NAME}" TAG="${env.TAG}" docker compose pull api
-                    IMAGE_NAME="${IMAGE_NAME}" TAG="${env.TAG}" docker compose up -d --no-deps api
+                    BACKEND_IMAGE="${IMAGE_NAME}" BACKEND_TAG="${env.TAG}" docker compose pull backend
+                    BACKEND_IMAGE="${IMAGE_NAME}" BACKEND_TAG="${env.TAG}" docker compose up -d --no-deps backend
 
                     docker image prune -f
                   '

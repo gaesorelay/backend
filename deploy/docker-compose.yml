@@ -3,27 +3,36 @@ services:
     image: nginx:1.25-alpine
     container_name: nginx
     ports:
-      - "80:80"
-      - "443:443"
+      - '80:80'
+      - '443:443'
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
-      - api
+      - backend
     networks:
       - app_net
     restart: unless-stopped
 
-  api:
-    image: ${IMAGE_NAME}:${TAG}
-    container_name: api
+  frontend:
+    image: ${FRONTEND_IMAGE:-zhy2on/gaesorelay-frontend}:${FRONTEND_TAG:-latest}
+    container_name: frontend
+    expose:
+      - '80'
+    networks:
+      - app_net
+    restart: unless-stopped
+
+  backend:
+    image: ${BACKEND_IMAGE:-zhy2on/gaesorelay-backend-api}:${BACKEND_TAG:-latest}
+    container_name: backend
     environment:
       NODE_ENV: production
       PORT: 8000
       REDIS_HOST: redis
       REDIS_PORT: 6379
     expose:
-      - "8000"
+      - '8000'
     depends_on:
       - redis
     networks:
