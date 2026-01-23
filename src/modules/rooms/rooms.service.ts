@@ -1,13 +1,12 @@
 import { Injectable, Inject, NotFoundException, BadRequestException } from '@nestjs/common';
 import Redis from 'ioredis';
-import { v4 as uuidv4 } from 'uuid';
 import { CreateRoomDto } from './dto/create-room.dto';
 import { CreateRoomResponseDto } from './dto/create-room.response.dto';
 import { RoomsRepository } from './rooms.repository';
 import { Room, RoomConfig } from '../../common/types/room.type';
 import { redisKeys } from '../../common/constants/redis.keys';
 import { User, UserRole } from '../../common/types/user.type';
-import { generateOwnerToken, generateRoomId } from '../../common/utils/id.util';
+import { generateUUIDToken, generateRoomId } from '../../common/utils/id.util';
 
 @Injectable()
 export class RoomsService {
@@ -15,7 +14,8 @@ export class RoomsService {
 
   async createRoom(dto: CreateRoomDto): Promise<CreateRoomResponseDto> {
     const roomId = generateRoomId();
-    const ownerToken = generateOwnerToken();
+    // 방 입
+    const ownerToken = generateUUIDToken();
     const room: Room = {
       roomUuid: roomId,
       ownerUserToken: ownerToken,
@@ -55,7 +55,9 @@ export class RoomsService {
     // 4. 유저 객체 생성
     // 첫 입장(currentCount === 0)이면 HOST, 아니면 PLAYER
     const role: UserRole = currentCount === 0 ? 'HOST' : 'PLAYER';
-    const userToken = uuidv4();
+
+    // 호스트일 경우 기존에 룸 정보에 저장되어 있던 토큰 사용
+    const userToken = role === 'HOST' ? room.ownerUserToken : generateUUIDToken();
 
     const newUser: User = {
       userToken: userToken,
