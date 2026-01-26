@@ -24,8 +24,8 @@ export class RoomsService {
       config: dto.config,
       createdAt: Date.now(),
     };
-
-    await this.roomsRepository.save(room);
+    const TTL_SECONDS = 60 * 60 * 12; // 12시간
+    await this.roomsRepository.save(room, TTL_SECONDS);
 
     // TODO: USER 레코드(토큰 PK) 생성 후 실제 userId/token 반환.
     return {
@@ -75,7 +75,7 @@ export class RoomsService {
     await this.roomsRepository.saveUser(newUser);
 
     // 소켓 ID 매핑 저장 (나중에 끊김 처리 등을 위해 필수)
-    await this.roomsRepository.saveSocketMapping(socketId, userToken);
+    await this.roomsRepository.saveSocketMapping(socketId, roomUuid, userToken);
 
     return newUser;
   }
@@ -96,5 +96,57 @@ export class RoomsService {
       currentUserCount: currentCount,
       // config 정보 등을 풀어서 줘도 좋음
     };
+  }
+
+  // 👇 leaveRoom 구현
+  async leaveRoom(socketId: string): Promise<{ roomUuid: string; nickname: string } | null> {
+    // 1. 소켓 ID로 방ID와 토큰 찾기
+    const mapping = await this.roomsRepository.getMappingBySocketId(socketId);
+    if (!mapping) return null; // 정보 없음
+
+    const { roomUuid, userToken } = mapping;
+
+    // 2. 유저 정보 가져오기 (닉네임 확보용)
+    const user = await this.roomsRepository.findUserByToken(roomUuid, userToken);
+    if (!user) return null;
+
+    // 3. 유저 삭제 (Redis)
+    await this.roomsRepository.deleteUser(roomUuid, userToken, socketId);
+
+    // 4. 방의 남은 인원 체크
+    const userCount = await this.roomsRepository.getUserCount(roomUuid);
+
+    // 5. 남은 사람이 0명이면 방 삭제 (자동 청소)
+    if (userCount === 0) {
+      await this.roomsRepository.delete(roomUuid);
+      console.log(`🧹 빈 방 삭제 완료: ${roomUuid}`);
+    }
+
+    return { roomUuid, nickname: user.nickname };
+  }
+
+  /**
+   * 소켓 연결이 끊어졌을 때 (재접속 대기 모드)
+   */
+  async handleConnectionLoss(socketId: string): Promise<void> {
+    // 1. 소켓 매핑정보 조회
+    const mapping = await this.roomsRepository.getMappingBySocketId(socketId);
+    if (!mapping) return; // 이미 없는 유저
+
+    const { roomUuid, userToken } = mapping;
+
+    // 2. 유저 정보 업데이트 (SocketId = null)
+    // 유저가 "나간 상태"임을 표시 (인게임에서 회색 화면 처리 등에 활용 가능)
+    await this.roomsRepository.updateUserSocket(roomUuid, userToken, null);
+
+    // 3. TTL 설정 (예: 120초 뒤에 자동 삭제)
+    // 120초 안에 다시 들어오지 않으면 Redis가 알아서 삭제함
+    const RECONNECT_WINDOW = 120;
+    await this.roomsRepository.setUserTTL(roomUuid, userToken, RECONNECT_WINDOW);
+
+    // 4. 끊어진 소켓 매핑 정보는 삭제 (재접속하면 새 소켓 ID를 받으므로)
+    await this.roomsRepository.deleteSocketMapping(socketId);
+
+    console.log(`⏳ 유저 연결 끊김 (재접속 대기 ${RECONNECT_WINDOW}초): ${userToken}`);
   }
 }

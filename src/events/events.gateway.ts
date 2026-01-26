@@ -36,9 +36,29 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     this.logger.log(`Client Connected : ${client.id}`);
   }
 
-  handleDisconnect(client: Socket) {
+  async handleDisconnect(client: Socket) {
     this.logger.log(`Client Disconnected : ${client.id}`);
-    // 나중에 여기에 "연결 끊김 처리(방 나가기)" 로직도 추가해야 함
+
+    try {
+      // 1. 서비스 호출: "이 사람 잠깐 나갔어요, 60초 타이머 켜세요"
+      await this.roomsService.handleConnectionLoss(client.id);
+
+      // 1. 서비스 호출: 유저 삭제 및 빈 방 정리
+      const leftUser = await this.roomsService.leaveRoom(client.id);
+
+      if (leftUser) {
+        this.logger.log(`🚪 유저 퇴장: ${leftUser.nickname} (방: ${leftUser.roomUuid})`);
+
+        // 2. 같은 방에 있는 사람들에게 알림
+        // (중요: 소켓은 이미 끊겼으므로 client.to() 대신 server.to()를 써야 할 수도 있지만,
+        //  client 인스턴스가 살아있다면 client.to()도 동작합니다. 안전하게 server 사용 추천)
+        this.server.to(leftUser.roomUuid).emit('user_left', {
+          nickname: leftUser.nickname,
+        });
+      }
+    } catch (error) {
+      this.logger.error(`퇴장 처리 중 에러: ${error.message}`);
+    }
   }
 
   // 👇 [핵심] 클라이언트의 'join_room' 요청을 받는 핸들러

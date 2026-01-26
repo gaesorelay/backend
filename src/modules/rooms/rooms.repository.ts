@@ -64,10 +64,11 @@ export class RoomsRepository {
     return keys.length;
   }
 
-  // 👇 [추가 3] 소켓 매핑 저장 (Socket ID -> User Token)
-  async saveSocketMapping(socketId: string, userToken: string): Promise<void> {
+  // [수정] 소켓 매핑 저장: roomUuid와 userToken을 같이 저장
+  async saveSocketMapping(socketId: string, roomUuid: string, userToken: string): Promise<void> {
     const key = redisKeys.socketMap(socketId);
-    await this.client.set(key, userToken);
+    const value = `${roomUuid}:${userToken}`; // 예: "room-123:user-456"
+    await this.client.set(key, value);
   }
 
   // 👇 [추가 4] 방의 모든 유저 목록 가져오기 (이미 입장한 유저 체크용)
@@ -81,5 +82,74 @@ export class RoomsRepository {
     const rawUsers = await this.client.mget(keys);
 
     return rawUsers.filter((raw) => raw !== null).map((raw) => JSON.parse(raw as string) as User);
+  }
+
+  // [수정] 매핑 정보 파싱해서 가져오기
+  async getMappingBySocketId(
+    socketId: string,
+  ): Promise<{ roomUuid: string; userToken: string } | null> {
+    const key = redisKeys.socketMap(socketId);
+    const value = await this.client.get(key);
+    if (!value) return null;
+
+    const [roomUuid, userToken] = value.split(':');
+    return { roomUuid, userToken };
+  }
+
+  // 👇 [추가] 유저 정보 조회 (삭제 전 정보 확인용)
+  async findUserByToken(roomUuid: string, userToken: string): Promise<User | null> {
+    const key = redisKeys.roomUser(roomUuid, userToken);
+    const data = await this.client.get(key);
+    if (!data) return null;
+    return JSON.parse(data);
+  }
+
+  // 👇 [추가] 유저 데이터 삭제 (유저 정보 + 소켓 매핑)
+  async deleteUser(roomUuid: string, userToken: string, socketId: string): Promise<void> {
+    const userKey = redisKeys.roomUser(roomUuid, userToken);
+    const socketKey = redisKeys.socketMap(socketId);
+
+    // 두 키를 동시에 삭제
+    await this.client.del(userKey, socketKey);
+  }
+
+  // 👇 [추가] 특정 유저 데이터에 만료 시간(TTL) 설정
+  async setUserTTL(roomUuid: string, userToken: string, ttlSeconds: number): Promise<void> {
+    const key = redisKeys.roomUser(roomUuid, userToken);
+    // 'EXPIRE' 명령어: 해당 키를 ttlSeconds 초 뒤에 삭제함
+    await this.client.expire(key, ttlSeconds);
+  }
+
+  // 👇 [추가] 특정 유저의 만료 시간 해제 (재접속 시 사용)
+  async clearUserTTL(roomUuid: string, userToken: string): Promise<void> {
+    const key = redisKeys.roomUser(roomUuid, userToken);
+    // 'PERSIST' 명령어: 만료 시간을 없애고 영구 저장으로 되돌림
+    await this.client.persist(key);
+  }
+
+  // 👇 [추가] 소켓 매핑 삭제 (연결 끊길 때 청소용)
+  async deleteSocketMapping(socketId: string): Promise<void> {
+    const key = redisKeys.socketMap(socketId);
+    await this.client.del(key);
+  }
+
+  // 👇 [수정] 유저 소켓 ID 업데이트 (NULL 처리를 위해)
+  async updateUserSocket(
+    roomUuid: string,
+    userToken: string,
+    socketId: string | null,
+  ): Promise<void> {
+    const key = redisKeys.roomUser(roomUuid, userToken);
+
+    // 기존 데이터를 가져와서 socketId만 수정 후 덮어쓰기 (Partial Update가 안되므로)
+    const data = await this.client.get(key);
+    if (data) {
+      const user = JSON.parse(data);
+      user.currentSocketId = socketId; // 연결 끊기면 null
+      await this.client.set(key, JSON.stringify(user));
+
+      // ⚠️ 주의: set을 하면 기존 TTL이 사라질 수 있으므로, TTL 설정은 set 직후에 해야 함
+      // (이 로직은 Service에서 제어하는 게 안전)
+    }
   }
 }
