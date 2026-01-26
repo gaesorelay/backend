@@ -11,6 +11,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
 import { RoomsService } from '../modules/rooms/rooms.service'; // Service import 필수
+import { AiJudgeService } from '../modules/ai-judges/ai-judges.service';
 import { User } from '../common/types/user.type'; // User 타입 import
 
 @WebSocketGateway({
@@ -26,7 +27,10 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
 
   // ⭐️ [핵심] RoomsService 주입!
   // 이제 Gateway가 Service의 함수(joinRoom 등)를 쓸 수 있게 됩니다.
-  constructor(private readonly roomsService: RoomsService) {}
+  constructor(
+    private readonly roomsService: RoomsService,
+    private readonly aiJudgesService: AiJudgeService,
+  ) {}
 
   afterInit(server: Server) {
     this.logger.log('✅ Socket Gateway Initialized');
@@ -109,9 +113,7 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     @MessageBody() data: { isReady: boolean },
   ) {
     // 유저가 준비 상태를 변경하면 대기실 상태를 전체에게 브로드캐스트
-    this.logger.log(
-      `game_ready request: socket ${client.id}, ready ${data.isReady}`,
-    );
+    this.logger.log(`game_ready request: socket ${client.id}, ready ${data.isReady}`);
 
     try {
       const { updatedUser, users, roomUuid } = await this.roomsService.setUserReady(
@@ -130,5 +132,28 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
       this.logger.error(`game_ready failed: ${error.message}`);
       return { status: 'error', message: error.message };
     }
+  }
+
+  /**
+   * [시나리오]
+   * 클라이언트가 "저희 문장 다 만들었어요/투표 끝났어요"라고 보내거나,
+   * 서버 타이머가 끝났을 때 이 함수가 실행된다고 가정합니다.
+   */
+  async handleRoundEnd(roomId: string, gameData: any) {
+    // 1. AI 평가 진행 (서버 내부에서 직접 호출)
+    // gameData에는 유저들이 만든 문장, 이미지 정보 등이 들어있어야 함
+    const dto = {
+      genre: '테스트 장르',
+      images: [{ tags: ['태그1'], description: '설명1' }],
+      sentence: '테스트 문장',
+    };
+    const aiResult = await this.aiJudgesService.evaluateSubmission(dto);
+
+    // 2. [방송] 방에 있는 모든 사람에게 결과 전송
+    this.server.to(roomId).emit('ai_judge_result', {
+      personaName: aiResult.personaName,
+      score: aiResult.score,
+      comment: aiResult.comment,
+    });
   }
 }

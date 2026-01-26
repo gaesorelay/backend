@@ -5,6 +5,7 @@ import { AppService } from './app.service';
 import { RoomsModule } from './modules/rooms/rooms.module';
 import { RedisModule } from './common/redis/redis.module';
 import { EventsModule } from './events/events.module';
+import { AiJudgeModule } from './modules/ai-judges/ai-judges.module';
 import configuration from './config/configuration';
 import * as Joi from 'joi';
 
@@ -12,15 +13,10 @@ import * as Joi from 'joi';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath:
-        process.env.NODE_ENV === 'production'
-          ? '.env.production'
-          : '.env.development',
+      envFilePath: process.env.NODE_ENV === 'production' ? '.env.production' : '.env.development',
       load: [configuration],
       validationSchema: Joi.object({
-        NODE_ENV: Joi.string()
-          .valid('development', 'production', 'test')
-          .default('development'),
+        NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
         PORT: Joi.number(),
         REDIS_HOST: Joi.string(),
         REDIS_PORT: Joi.number(),
@@ -29,6 +25,7 @@ import * as Joi from 'joi';
     RedisModule,
     RoomsModule,
     EventsModule,
+    AiJudgeModule,
   ],
   controllers: [AppController],
   providers: [AppService],
