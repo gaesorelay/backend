@@ -37,11 +37,38 @@ export class RoomsService {
   /**
    * 방 입장 로직
    */
-  async joinRoom(roomUuid: string, nickname: string, socketId: string): Promise<User> {
+  async joinRoom(
+    roomUuid: string,
+    nickname: string,
+    socketId: string,
+    userToken?: string,
+  ): Promise<User> {
     // 1. 방 존재 여부 확인 (Repository 사용)
     const room = await this.roomsRepository.findById(roomUuid);
     if (!room) {
       throw new NotFoundException('존재하지 않는 방입니다.');
+    }
+    // ⭐️ [신규] 재접속 시도인지 확인 (토큰을 들고 왔는가?)
+    if (userToken) {
+      // 2-1. Redis에서 기존 유저 정보 조회
+      const existingUser = await this.roomsRepository.findUserByToken(roomUuid, userToken);
+
+      // 유저가 존재한다면? (TTL이 안 끝나서 살아있다면)
+      if (existingUser) {
+        console.log(`♻️ 재접속 감지: ${nickname} (${userToken})`);
+
+        // A. 소켓 ID 업데이트 (새 소켓 ID로 갱신)
+        await this.roomsRepository.updateUserSocket(roomUuid, userToken, socketId);
+
+        // B. 소켓 매핑 새로 저장 (새 소켓 ID -> 기존 토큰)
+        await this.roomsRepository.saveSocketMapping(socketId, roomUuid, userToken);
+
+        // C. TTL 해제 (삭제 예약 취소)
+        await this.roomsRepository.clearUserTTL(roomUuid, userToken);
+
+        // D. 유저 상태를 '접속중'으로 변경 (필요하다면 isReady 등을 조정)
+        return existingUser; // 기존 정보 반환하고 끝!
+      }
     }
 
     // 3. 인원 수 체크
@@ -57,10 +84,10 @@ export class RoomsService {
     const role: UserRole = currentCount === 0 ? 'HOST' : 'PLAYER';
 
     // 호스트일 경우 기존에 룸 정보에 저장되어 있던 토큰 사용
-    const userToken = role === 'HOST' ? room.ownerUserToken : generateUUIDToken();
+    const newuserToken = role === 'HOST' ? room.ownerUserToken : generateUUIDToken();
 
     const newUser: User = {
-      userToken: userToken,
+      userToken: newuserToken,
       currentSocketId: socketId,
       roomUuid: roomUuid,
       nickname: nickname,
@@ -75,7 +102,7 @@ export class RoomsService {
     await this.roomsRepository.saveUser(newUser);
 
     // 소켓 ID 매핑 저장 (나중에 끊김 처리 등을 위해 필수)
-    await this.roomsRepository.saveSocketMapping(socketId, roomUuid, userToken);
+    await this.roomsRepository.saveSocketMapping(socketId, roomUuid, newuserToken);
 
     return newUser;
   }

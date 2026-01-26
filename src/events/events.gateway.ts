@@ -65,14 +65,19 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
   @SubscribeMessage('join_room')
   async handleJoinRoom(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { roomId: string; nickname: string },
+    @MessageBody() data: { roomId: string; nickname: string; userToken?: string },
   ) {
     this.logger.log(`🔍 join_room 요청: 방=${data.roomId}, 닉네임=${data.nickname}`);
 
     try {
       // 1. 비즈니스 로직 실행 (Redis에 유저 저장)
       // Service의 joinRoom 함수가 User 객체를 리턴한다고 가정
-      const user: User = await this.roomsService.joinRoom(data.roomId, data.nickname, client.id);
+      const user: User = await this.roomsService.joinRoom(
+        data.roomId,
+        data.nickname,
+        client.id,
+        data.userToken,
+      );
 
       // 2. 소켓을 해당 방 채널(Room)에 실제로 접속시킴
       // 이게 되어야 server.to(roomId).emit()을 했을 때 메시지를 받을 수 있음

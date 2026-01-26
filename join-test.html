@@ -69,19 +69,27 @@
       function joinRoom() {
         const roomId = document.getElementById('roomIdInput').value;
         const nickname = document.getElementById('nicknameInput').value;
+        const savedToken = localStorage.getItem('my_user_token');
 
-        log(`📤 입장 요청 보냄 (방: ${roomId}, 닉네임: ${nickname})`, 'black');
+        log(`📤 입장 요청 보냄 (토큰: ${savedToken ? savedToken : '없음'})`, 'black');
 
         // 서버로 'join_room' 이벤트 전송 (응답 받을 콜백 포함)
-        socket.emit('join_room', { roomId, nickname }, (response) => {
+        socket.emit('join_room', { roomId, nickname, userToken: savedToken }, (response) => {
           console.log('서버 응답:', response);
 
           if (response.status === 'success') {
             const user = response.data;
-            log(`🎉 입장 성공! 역할: ${user.role}, 팀: ${user.team}`, 'green');
+            // 👇 [중요] 발급받은 토큰을 브라우저에 저장!
+            localStorage.setItem('my_user_token', user.userToken);
+            log(
+              `🎉 입장 성공! 역할: ${user.role}, 팀: ${user.team} (재접속 여부: ${savedToken === user.userToken})`,
+              'green',
+            );
             log(`   - 내 토큰: ${user.userToken}`);
           } else {
             log(`❌ 입장 실패: ${response.message}`, 'red');
+            // 실패하면 토큰이 유효하지 않은 것이므로 삭제
+            localStorage.removeItem('my_user_token');
           }
         });
       }
