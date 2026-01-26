@@ -1,4 +1,4 @@
-import { Injectable, Inject, NotFoundException, BadRequestException } from '@nestjs/common';
+﻿import { Injectable, Inject, NotFoundException, BadRequestException } from '@nestjs/common';
 import Redis from 'ioredis';
 import { CreateRoomDto } from './dto/create-room.dto';
 import { CreateRoomResponseDto } from './dto/create-room.response.dto';
@@ -125,6 +125,28 @@ export class RoomsService {
     };
   }
 
+  async setUserReady(socketId: string, isReady: boolean) {
+    // 대기실 준비 상태 토글 및 최신 유저 목록 반환
+    const mapping = await this.roomsRepository.getMappingBySocketId(socketId);
+    if (!mapping) {
+      throw new NotFoundException('User not found.');
+    }
+
+    const user = await this.roomsRepository.findUserByToken(mapping.roomUuid, mapping.userToken);
+    if (!user) {
+      throw new NotFoundException('User not found.');
+    }
+
+    const updatedUser: User = {
+      ...user,
+      isReady,
+    };
+
+    await this.roomsRepository.saveUser(updatedUser);
+    const users = await this.roomsRepository.findAllUsersInRoom(user.roomUuid);
+
+    return { updatedUser, users, roomUuid: user.roomUuid };
+  }
   // 👇 leaveRoom 구현
   async leaveRoom(socketId: string): Promise<{ roomUuid: string; nickname: string } | null> {
     // 1. 소켓 ID로 방ID와 토큰 찾기

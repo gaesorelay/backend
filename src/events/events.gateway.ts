@@ -102,4 +102,33 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
       return { status: 'error', message: error.message };
     }
   }
+
+  @SubscribeMessage('game_ready')
+  async handleGameReady(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { isReady: boolean },
+  ) {
+    // 유저가 준비 상태를 변경하면 대기실 상태를 전체에게 브로드캐스트
+    this.logger.log(
+      `game_ready request: socket ${client.id}, ready ${data.isReady}`,
+    );
+
+    try {
+      const { updatedUser, users, roomUuid } = await this.roomsService.setUserReady(
+        client.id,
+        data.isReady,
+      );
+
+      // 대기실 UI 갱신 이벤트
+      this.server.to(roomUuid).emit('lobby_updated', {
+        users,
+        updatedUser,
+      });
+
+      return { status: 'success', data: updatedUser };
+    } catch (error) {
+      this.logger.error(`game_ready failed: ${error.message}`);
+      return { status: 'error', message: error.message };
+    }
+  }
 }

@@ -49,6 +49,12 @@ export class RoomsRepository {
     await this.client.set(key, JSON.stringify(user));
   }
 
+  async findUserTokenBySocketId(socketId: string): Promise<string | null> {
+    const key = redisKeys.socketMap(socketId);
+    const userToken = await this.client.get(key);
+    return userToken ?? null;
+  }
+
   // 👇 [추가 2] 특정 방의 현재 인원 수 조회
   async getUserCount(roomUuid: string): Promise<number> {
     const pattern = redisKeys.roomUsers(roomUuid);
@@ -81,7 +87,7 @@ export class RoomsRepository {
     // 여러 키의 값을 한 번에 가져옴 (MGET)
     const rawUsers = await this.client.mget(keys);
 
-    return rawUsers.filter((raw) => raw !== null).map((raw) => JSON.parse(raw as string) as User);
+    return rawUsers.filter((raw) => raw !== null).map((raw) => JSON.parse(raw) as User);
   }
 
   // [수정] 매핑 정보 파싱해서 가져오기
