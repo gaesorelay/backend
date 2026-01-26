@@ -63,6 +63,20 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
 
+  swagger:
+      image: swaggerapi/swagger-ui:latest
+      container_name: swagger
+      environment:
+        - URL=/spec/openapi.yaml
+        - BASE_URL=/
+      volumes:
+        - ./swagger/public:/usr/share/nginx/html/spec:ro
+      expose:
+        - '8080'
+      networks:
+        - app_net
+      restart: unless-stopped
+
 networks:
   app_net:
     driver: bridge

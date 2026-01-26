@@ -30,6 +30,7 @@ pipeline {
 
         script {
           env.TAG = "sha-${env.GIT_COMMIT.take(7)}"
+          writeFile file: '.tag', text: env.TAG
           echo "TAG=${env.TAG}"
           echo "CHANGE_ID=${env.CHANGE_ID}, CHANGE_TARGET=${env.CHANGE_TARGET}, BRANCH_NAME=${env.BRANCH_NAME}"
         }
@@ -38,7 +39,7 @@ pipeline {
         sh 'npm test'
         sh 'npm run build'
 
-        stash name: 'ws', includes: '**/*', useDefaultExcludes: false
+        stash name: 'meta', includes: '.tag'
       }
     }
 
@@ -56,14 +57,10 @@ pipeline {
         stage('Prepare Workspace') {
           steps {
             deleteDir()
-            unstash 'ws'
+            checkout scm
+            unstash 'meta'
             script {
-              if (!env.TAG) {
-                if (!env.GIT_COMMIT) {
-                  checkout scm
-                }
-                env.TAG = "sha-${env.GIT_COMMIT.take(7)}"
-              }
+              env.TAG = readFile('.tag').trim()
               echo "Deploy TAG=${env.TAG}"
             }
           }
@@ -101,6 +98,8 @@ pipeline {
                   ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_SERVER_IP} 'mkdir -p ${DEPLOY_DIR}'
 
                   scp -o StrictHostKeyChecking=no deploy/docker-compose.yml ${DEPLOY_USER}@${DEPLOY_SERVER_IP}:${DEPLOY_DIR}/docker-compose.yml
+
+                  scp -o StrictHostKeyChecking=no deploy/swagger/public/openapi.yaml ${DEPLOY_USER}@${DEPLOY_SERVER_IP}:${DEPLOY_DIR}/swagger/public/openapi.yaml
 
                   ssh -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_SERVER_IP} '
                     set -e

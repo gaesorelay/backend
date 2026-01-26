@@ -1,0 +1,171 @@
+openapi: 3.0.0
+info:
+  title: 개소릴레이 API
+  description: 개소릴레이 백엔드 API 명세서
+  version: 1.0.0
+servers:
+  - url: http://localhost:8000/api
+    description: 로컬 개발 서버
+components:
+  schemas:
+    RoomConfig:
+      type: object
+      properties:
+        roundCount:
+          type: number
+          description: 총 라운드 수
+          example: 3
+        roundTimeSeconds:
+          type: number
+          description: 라운드 당 시간 (초)
+          example: 60
+        votingTimeSeconds:
+          type: number
+          description: 투표 시간 (초)
+          example: 30
+        teamSize:
+          type: number
+          description: 팀당 인원 수
+          example: 4
+      required:
+        - roundCount
+        - roundTimeSeconds
+        - votingTimeSeconds
+        - teamSize
+    CreateRoomDto:
+      type: object
+      properties:
+        title:
+          type: string
+          description: 방 제목
+          example: "즐거운 개소릴레이"
+        config:
+          $ref: '#/components/schemas/RoomConfig'
+        nickname:
+          type: string
+          description: 방장 닉네임
+          example: "호스트유저"
+        avatarId:
+          type: number
+          description: 방장이 선택한 아바타 ID
+          example: 1
+      required:
+        - title
+        - config
+        - nickname
+        - avatarId
+    CreateRoomResponseDto:
+      type: object
+      properties:
+        roomId:
+          type: string
+          description: 생성된 방의 UUID
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        token:
+          type: string
+          description: 방장 토큰 (재접속 식별용)
+          example: "user-token-uuid-1234"
+      required:
+        - roomId
+        - token
+    RoomResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "success"
+        data:
+          type: object
+          properties:
+            roomUuid:
+              type: string
+              description: 방 UUID
+            ownerUserToken:
+              type: string
+              description: 방장 토큰
+            title:
+              type: string
+              description: 방 제목
+            status:
+              type: string
+              description: 방 상태 (LOBBY, PLAYING, VOTING, RESULT)
+              enum: [LOBBY, PLAYING, VOTING, RESULT]
+            config:
+              $ref: '#/components/schemas/RoomConfig'
+            createdAt:
+              type: number
+              description: 생성 시간 (Timestamp)
+            currentUserCount:
+              type: number
+              description: 현재 접속 중인 인원 수
+          required:
+            - roomUuid
+            - ownerUserToken
+            - title
+            - status
+            - config
+            - createdAt
+            - currentUserCount
+paths:
+  /:
+    get:
+      summary: 서버 상태 확인
+      description: 서버가 정상 작동 중인지 확인하는 간단한 메시지를 반환합니다.
+      responses:
+        '200':
+          description: 성공
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "DogSound Relay Server Running!"
+  /test-redis:
+    get:
+      summary: Redis 연결 테스트
+      description: 테스트용 방을 Redis에 생성하고 조회하여 Redis 연결 상태를 확인합니다.
+      responses:
+        '200':
+          description: 성공
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                description: Redis에 저장된 방 정보
+  /rooms:
+    post:
+      summary: 방 생성
+      description: 입력받은 설정으로 새로운 게임 방을 생성합니다.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRoomDto'
+      responses:
+        '201':
+          description: 방 생성 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateRoomResponseDto'
+  /rooms/{roomUuid}:
+    get:
+      summary: 방 정보 조회
+      description: 특정 방의 상세 정보와 현재 접속 인원 수를 조회합니다.
+      parameters:
+        - in: path
+          name: roomUuid
+          required: true
+          schema:
+            type: string
+          description: 조회할 방의 UUID
+      responses:
+        '200':
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoomResponse'
+        '404':
+          description: 해당 방을 찾을 수 없음
