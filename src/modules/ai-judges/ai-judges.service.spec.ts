@@ -5,6 +5,7 @@ import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { of } from 'rxjs'; // RxJS observable 생성용
 import { JudgeConfig, PERSONAS } from './personas.constant';
+import { AiJudgesRepository } from './ai-judges.repository';
 
 describe('AiJudgeService', () => {
   let service: AiJudgeService;
@@ -26,6 +27,11 @@ describe('AiJudgeService', () => {
     },
   };
 
+  const mockAiJudgesRepository = {
+    saveSelectedJudges: jest.fn(),
+    getSelectedJudges: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -42,6 +48,10 @@ describe('AiJudgeService', () => {
           useValue: {
             post: jest.fn().mockReturnValue(of(mockGptResponse)),
           },
+        },
+        {
+          provide: AiJudgesRepository, // 실제 클래스 이름
+          useValue: mockAiJudgesRepository, // 위에서 만든 가짜 객체
         },
       ],
     }).compile();
