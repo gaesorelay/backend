@@ -6,6 +6,7 @@ import { RoomsRepository } from './rooms.repository';
 import { Room, RoomConfig } from '../../common/types/room.type';
 import { redisKeys } from '../../common/constants/redis.keys';
 import { User, UserRole, UserTeam } from '../../common/types/user.type';
+import { PERSONAS, JudgeConfig } from '../../modules/ai-judges/personas.constant';
 import { generateUUIDToken, generateRoomId } from '../../common/utils/id.util';
 
 @Injectable()
