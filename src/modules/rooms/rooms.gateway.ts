@@ -113,4 +113,44 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayConnection, OnGatew
       return { status: 'error', message: error.message };
     }
   }
+
+  @SubscribeMessage('join_team')
+  async handleJoinTeam(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    data: { public_user_id: number; slot_index: number; team: string },
+  ) {
+    this.logger.log(
+      `join_team request: socket ${client.id}, target ${data.public_user_id}, team ${data.team}, slot ${data.slot_index}`,
+    );
+
+    try {
+      const { updatedUser, users, roomUuid } = await this.roomsService.joinTeam(
+        client.id,
+        data.public_user_id,
+        data.slot_index,
+        data.team,
+      );
+
+      this.server.to(roomUuid).emit('lobby_updated', {
+        users,
+        updatedUser,
+      });
+
+      return {
+        status: 'success',
+        data: {
+          updatedUser: {
+            publicUserId: updatedUser.publicUserId,
+            team: updatedUser.team,
+            role: updatedUser.role,
+            slotIndex: updatedUser.slotIndex,
+          },
+        },
+      };
+    } catch (error) {
+      this.logger.error(`join_team failed: ${error.message}`);
+      return { status: 'error', message: error.message };
+    }
+  }
 }
