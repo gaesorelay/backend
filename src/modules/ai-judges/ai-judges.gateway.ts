@@ -10,7 +10,7 @@ import { AiJudgeService } from '../../modules/ai-judges/ai-judges.service';
 import { EvaluateSubmissionDto } from './dto/judge.dto';
 
 @WebSocketGateway({
-  namespace: 'rooms', // 네임스페이스 확인
+  namespace: 'game',
   cors: {
     origin: '*', // CORS 허용
     credentials: true,

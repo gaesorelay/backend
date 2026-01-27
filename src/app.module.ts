@@ -7,6 +7,7 @@ import { RedisModule } from './common/redis/redis.module';
 import { AiJudgeModule } from './modules/ai-judges/ai-judges.module';
 import configuration from './config/configuration';
 import * as Joi from 'joi';
+import { CoreGateway } from './common/gateways/core.gateway';
 
 @Module({
   imports: [
@@ -26,6 +27,6 @@ import * as Joi from 'joi';
     AiJudgeModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, CoreGateway],
 })
 export class AppModule {}
