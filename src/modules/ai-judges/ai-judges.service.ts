@@ -51,15 +51,20 @@ export class AiJudgeService {
       throw new NotFoundException('선정된 심사위원이 없습니다.');
     }
 
-    // 이름으로 JudgeConfig 객체 찾기
-    const targetJudges = judgeNames.map((name) => {
-      const found = PERSONAS.find((p) => p.name === name);
-      if (!found) throw new NotFoundException(`심사위원 데이터 없음: ${name}`);
-      return found;
-    });
+    // 1-2. 이름 -> JudgeConfig 객체로 변환
+    const targetJudges = this.mapNamesToJudges(judgeNames);
 
-    // 👇 [수정] map 내부 변수명 변경 (persona -> judge)
-    const promises = targetJudges.map((judge) => this.evaluateSingle(judge, dto));
+    // 1-3. 병렬 심사 위임 (코드 재사용!)
+    return this.evaluateMultiple(targetJudges, dto);
+  }
+
+  /**
+   * [2. 테스트 및 공용] 다중 심사 실행
+   * JudgeConfig 객체 배열을 받아 병렬로 처리합니다.
+   * (컨트롤러나 evaluateRoom에서 이 메서드를 사용합니다)
+   */
+  async evaluateMultiple(judges: JudgeConfig[], dto: any): Promise<PersonaResult[]> {
+    const promises = judges.map((judge) => this.evaluateSingle(judge, dto));
 
     return await Promise.all(promises);
   }
@@ -151,5 +156,14 @@ export class AiJudgeService {
       === [사용자가 작성한 문장] ===
       "${dto.sentence}"
     `;
+  }
+
+  // [Helper] 이름 배열을 JudgeConfig 배열로 변환하는 헬퍼 함수
+  mapNamesToJudges(names: string[]): JudgeConfig[] {
+    return names.map((name) => {
+      const found = PERSONAS.find((p) => p.name === name);
+      if (!found) throw new NotFoundException(`심사위원 데이터 없음: ${name}`);
+      return found;
+    });
   }
 }
