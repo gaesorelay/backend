@@ -68,10 +68,7 @@ export class AiJudgeService {
    * [내부용] 단일 심사 함수
    * 랜덤 선택 로직을 제거하고, 파라미터로 받은 persona로 심사합니다.
    */
-  private async evaluateSingle(
-    judge: JudgeConfig,
-    dto: EvaluateSubmissionDto,
-  ): Promise<PersonaResult> {
+  async evaluateSingle(judge: JudgeConfig, dto: EvaluateSubmissionDto): Promise<PersonaResult> {
     const gmsKey = this.configService.get<string>('GMS_API_KEY');
     const url = 'https://gms.ssafy.io/gmsapi/api.openai.com/v1/chat/completions';
 

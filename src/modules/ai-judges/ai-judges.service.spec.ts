@@ -4,12 +4,13 @@ import { AiJudgeService } from './ai-judges.service';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { of } from 'rxjs'; // RxJS observable 생성용
+import { JudgeConfig, PERSONAS } from './personas.constant';
 
 describe('AiJudgeService', () => {
   let service: AiJudgeService;
   let httpService: HttpService;
 
-  // 가짜 응답 데이터 (GMS가 줄 것이라고 가정하는 데이터)
+  // 1. GMS API가 줄 것이라고 가정하는 가짜 응답 데이터
   const mockGptResponse = {
     data: {
       choices: [
@@ -32,13 +33,13 @@ describe('AiJudgeService', () => {
         {
           provide: ConfigService,
           useValue: {
-            get: jest.fn().mockReturnValue('FAKE_API_KEY'), // 가짜 키
+            // 코드에서 'GMS_API_KEY'를 찾으므로 이에 맞춰줍니다.
+            get: jest.fn().mockReturnValue('FAKE_API_KEY'),
           },
         },
         {
           provide: HttpService,
           useValue: {
-            // post 메서드가 호출되면 위의 mockGptResponse를 Observable로 반환
             post: jest.fn().mockReturnValue(of(mockGptResponse)),
           },
         },
@@ -49,27 +50,47 @@ describe('AiJudgeService', () => {
     httpService = module.get<HttpService>(HttpService);
   });
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
-  });
+  it('단일 심사위원(judge) 정보로 평가를 수행하고 결과를 반환해야 한다', async () => {
+    // [준비 1] 가상의 심사위원 데이터 생성 (JudgeConfig 타입)
+    const mockJudge: JudgeConfig = {
+      name: '테스트 판사',
+      persona: '너는 테스트를 위한 가상의 판사야.',
+      imageUrl: 'http://example.com/judge.png',
+    };
 
-  it('문장을 평가하고 페르소나 결과(객체)를 반환해야 한다', async () => {
-    // 1. 입력 데이터 준비
+    // [준비 2] 평가받을 문장 데이터 생성 (DTO)
     const dto = {
       genre: '테스트 장르',
       images: [{ tags: ['태그1'], description: '설명1' }],
-      sentence: '테스트 문장',
+      sentence: '테스트 문장입니다.',
     };
 
-    // 2. 서비스 실행
-    const result = await service.evaluateSubmission(dto);
+    // [실행] evaluateSingle 호출 (심사위원 + DTO 전달)
+    const result = await service.evaluateSingle(mockJudge, dto);
 
-    // 3. 검증 (Expectation)
-    expect(result).toHaveProperty('personaName'); // 페르소나 이름이 있어야 함
-    expect(result.score).toBe(95); // Mock 점수와 같아야 함
-    expect(result.comment).toBe('테스트 코멘트입니다.'); // Mock 코멘트와 같아야 함
+    // [검증]
+    // 1. 결과에 심사위원 이름이 제대로 매핑되었는지 확인
+    expect(result.personaName).toBe('테스트 판사');
 
-    // httpService.post가 1번 호출되었는지 확인
+    // 2. 점수와 코멘트가 Mock API 응답대로 왔는지 확인
+    expect(result.score).toBe(95);
+    expect(result.comment).toBe('테스트 코멘트입니다.');
+
+    // 3. HTTP 요청이 1번 발생했는지 확인
     expect(httpService.post).toHaveBeenCalledTimes(1);
+
+    // (선택) HTTP 요청 시 시스템 프롬프트에 심사위원 페르소나가 잘 들어갔는지 확인
+    expect(httpService.post).toHaveBeenCalledWith(
+      expect.stringContaining('gmsapi/api.openai.com/v1/chat/completions'), // URL 체크
+      expect.objectContaining({
+        messages: expect.arrayContaining([
+          expect.objectContaining({
+            role: 'system',
+            content: expect.stringContaining('너는 테스트를 위한 가상의 판사야.'), // 페르소나 주입 확인
+          }),
+        ]),
+      }),
+      expect.anything(), // 헤더 부분은 체크 생략 (anything)
+    );
   });
 });
