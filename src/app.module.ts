@@ -4,7 +4,6 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { RoomsModule } from './modules/rooms/rooms.module';
 import { RedisModule } from './common/redis/redis.module';
-import { EventsModule } from './events/events.module';
 import { AiJudgeModule } from './modules/ai-judges/ai-judges.module';
 import configuration from './config/configuration';
 import * as Joi from 'joi';
@@ -24,7 +23,6 @@ import * as Joi from 'joi';
     }),
     RedisModule,
     RoomsModule,
-    EventsModule,
     AiJudgeModule,
   ],
   controllers: [AppController],
