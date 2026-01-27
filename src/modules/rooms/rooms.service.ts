@@ -42,6 +42,7 @@ export class RoomsService {
     roomUuid: string,
     nickname: string,
     socketId: string,
+    avatarId: number,
     userToken?: string,
   ): Promise<User> {
     // 1. 방 존재 여부 확인 (Repository 사용)
@@ -89,6 +90,9 @@ export class RoomsService {
 
     const publicUserId = await this.roomsRepository.nextPublicUserId(roomUuid);
 
+    //사용자가 지정한 아바타가 없을 경우, 랜덤으로 결정
+    const resolvedAvatarId = avatarId ?? Math.floor(Math.random() * 5) + 1;
+
     const newUser: User = {
       userToken: newuserToken,
       publicUserId: publicUserId,
@@ -97,7 +101,7 @@ export class RoomsService {
       nickname: nickname,
       role: role,
       team: 'NONE', // 팀은 나중에 선택
-      avatarId: Math.floor(Math.random() * 5) + 1, // 임시: 1~5 랜덤 아바타
+      avatarId: resolvedAvatarId,
       isReady: false, // User 인터페이스에 정의된 대로
     };
 

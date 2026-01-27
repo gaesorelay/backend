@@ -58,7 +58,7 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayConnection, OnGatew
   async handleJoinRoom(
     @ConnectedSocket() client: Socket,
     @MessageBody()
-    data: { roomId: string; nickname: string; userToken?: string },
+    data: { roomId: string; nickname: string; avatarId: number; userToken?: string },
   ) {
     this.logger.log(`🔍 join_room 요청: 방=${data.roomId}, 닉네임=${data.nickname}`);
 
@@ -67,6 +67,7 @@ export class RoomsGateway implements OnGatewayInit, OnGatewayConnection, OnGatew
         data.roomId,
         data.nickname,
         client.id,
+        data.avatarId,
         data.userToken,
       );
 
