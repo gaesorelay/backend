@@ -5,6 +5,8 @@ export const redisKeys = {
   roomUsers: (roomUuid: string) => `room:${roomUuid}:users:*`,
 
   roomUser: (roomUuid: string, userToken: string) => `room:${roomUuid}:users:${userToken}`,
+  roomUserByTokenPattern: (userToken: string) => `room:*:users:${userToken}`,
+  roomUserSeq: (roomUuid: string) => `room:${roomUuid}:user_seq`,
 
   socketMap: (socketId: string) => `socket:${socketId}`,
 

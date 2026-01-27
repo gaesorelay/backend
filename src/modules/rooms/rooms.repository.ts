@@ -55,6 +55,11 @@ export class RoomsRepository {
     return userToken ?? null;
   }
 
+  async nextPublicUserId(roomUuid: string): Promise<number> {
+    const key = redisKeys.roomUserSeq(roomUuid);
+    return this.client.incr(key);
+  }
+
   // 👇 [추가 2] 특정 방의 현재 인원 수 조회
   async getUserCount(roomUuid: string): Promise<number> {
     const pattern = redisKeys.roomUsers(roomUuid);

@@ -5,7 +5,7 @@ import { CreateRoomResponseDto } from './dto/create-room.response.dto';
 import { RoomsRepository } from './rooms.repository';
 import { Room, RoomConfig } from '../../common/types/room.type';
 import { redisKeys } from '../../common/constants/redis.keys';
-import { User, UserRole } from '../../common/types/user.type';
+import { User, UserRole, UserTeam } from '../../common/types/user.type';
 import { generateUUIDToken, generateRoomId } from '../../common/utils/id.util';
 
 @Injectable()
@@ -86,8 +86,11 @@ export class RoomsService {
     // 호스트일 경우 기존에 룸 정보에 저장되어 있던 토큰 사용
     const newuserToken = role === 'HOST' ? room.ownerUserToken : generateUUIDToken();
 
+    const publicUserId = await this.roomsRepository.nextPublicUserId(roomUuid);
+
     const newUser: User = {
       userToken: newuserToken,
+      publicUserId: publicUserId,
       currentSocketId: socketId,
       roomUuid: roomUuid,
       nickname: nickname,
@@ -146,6 +149,59 @@ export class RoomsService {
     const users = await this.roomsRepository.findAllUsersInRoom(user.roomUuid);
 
     return { updatedUser, users, roomUuid: user.roomUuid };
+  }
+
+  async joinTeam(
+    socketId: string,
+    targetPublicUserId: number,
+    slotIndex: number,
+    teamInput: string,
+  ): Promise<{ updatedUser: User; users: User[]; roomUuid: string }> {
+    const mapping = await this.roomsRepository.getMappingBySocketId(socketId);
+    if (!mapping) {
+      throw new NotFoundException('User not found.');
+    }
+
+    const requester = await this.roomsRepository.findUserByToken(
+      mapping.roomUuid,
+      mapping.userToken,
+    );
+    if (!requester) {
+      throw new NotFoundException('User not found.');
+    }
+
+    if (requester.publicUserId !== targetPublicUserId && requester.role !== 'HOST') {
+      throw new BadRequestException('Only host can assign other users.');
+    }
+
+    let team: UserTeam;
+    if (teamInput === 'A' || teamInput === 'TEAM_A') {
+      team = 'TEAM_A';
+    } else if (teamInput === 'B' || teamInput === 'TEAM_B') {
+      team = 'TEAM_B';
+    } else {
+      throw new BadRequestException('Invalid team.');
+    }
+
+    const users = await this.roomsRepository.findAllUsersInRoom(mapping.roomUuid);
+    const target = users.find((user) => user.publicUserId === targetPublicUserId);
+    if (!target) {
+      throw new NotFoundException('Target user not found.');
+    }
+
+    const updatedUser: User = {
+      ...target,
+      team,
+      slotIndex,
+    };
+
+    await this.roomsRepository.saveUser(updatedUser);
+
+    const updatedUsers = users.map((user) =>
+      user.publicUserId === targetPublicUserId ? updatedUser : user,
+    );
+
+    return { updatedUser, users: updatedUsers, roomUuid: mapping.roomUuid };
   }
   // 👇 leaveRoom 구현
   async leaveRoom(socketId: string): Promise<{ roomUuid: string; nickname: string } | null> {
