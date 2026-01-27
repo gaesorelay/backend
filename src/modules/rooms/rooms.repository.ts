@@ -163,4 +163,18 @@ export class RoomsRepository {
       // (이 로직은 Service에서 제어하는 게 안전)
     }
   }
+
+  // [추가] 심사위원 목록 저장/조회 메서드
+  async saveRoomJudges(roomUuid: string, judgeNames: string[]): Promise<void> {
+    const key = `room:${roomUuid}:ai_judge`;
+    // 배열을 JSON 문자열로 변환하여 저장
+    await this.client.set(key, JSON.stringify(judgeNames));
+  }
+
+  async getRoomJudges(roomUuid: string): Promise<string[] | null> {
+    const key = `room:${roomUuid}:ai_judge`;
+    const data = await this.client.get(key);
+    if (!data) return null;
+    return JSON.parse(data);
+  }
 }
