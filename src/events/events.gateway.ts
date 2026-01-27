@@ -12,6 +12,7 @@ import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
 import { RoomsService } from '../modules/rooms/rooms.service'; // Service import 필수
 import { AiJudgeService } from '../modules/ai-judges/ai-judges.service';
+import { RoomsRepository } from '../modules/rooms/rooms.repository';
 import { User } from '../common/types/user.type'; // User 타입 import
 
 @WebSocketGateway({
@@ -30,6 +31,7 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
   constructor(
     private readonly roomsService: RoomsService,
     private readonly aiJudgesService: AiJudgeService,
+    private readonly RoomsRepository: RoomsRepository,
   ) {}
 
   afterInit(server: Server) {
@@ -134,26 +136,51 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     }
   }
 
+  // 1. 게임 시작 (심사위원 선정)
+  @SubscribeMessage('start_game')
+  async handleStartGame(@MessageBody() data: { roomId: string }) {
+    // RoomsService에서 3명 뽑아서 저장하고 리턴함
+    const judges = await this.roomsService.startGame(data.roomId);
+
+    // 방 전체에 알림
+    this.server.to(data.roomId).emit('game_started', {
+      judges: judges, // { name, imageUrl, ... } 리스트 전송
+    });
+  }
+
+  // 2. 심사 요청 (게임 종료 시)
   /**
    * [시나리오]
    * 클라이언트가 "저희 문장 다 만들었어요/투표 끝났어요"라고 보내거나,
    * 서버 타이머가 끝났을 때 이 함수가 실행된다고 가정합니다.
    */
-  async handleRoundEnd(roomId: string, gameData: any) {
-    // 1. AI 평가 진행 (서버 내부에서 직접 호출)
+  @SubscribeMessage('request_judging')
+  async handleRoundEnd(@MessageBody() data: { roomId: string; gamedata: any }) {
     // gameData에는 유저들이 만든 문장, 이미지 정보 등이 들어있어야 함
+    // A. 저장해뒀던 심사위원 이름(name) 꺼내오기
+    const judgeNames = await this.RoomsRepository.getRoomJudges(data.roomId);
+
+    if (!judgeNames || judgeNames.length === 0) {
+      // 예외처리: 심사위원이 없으면 에러를 보내거나 다시 뽑아야 함
+      this.server.to(data.roomId).emit('error', { message: '심사위원 정보가 없습니다.' });
+      return;
+    }
+
+    // B. 평가할 게임 데이터 가져오기 (Redis 등에서 조회)
+    // const storyData = await this.roomsService.getFullStory(data.roomId);
+    // 임시 더미 데이터 (실제로는 위 주석처럼 조회해서 넣으세요)
     const dto = {
       genre: '테스트 장르',
       images: [{ tags: ['태그1'], description: '설명1' }],
       sentence: '테스트 문장',
     };
-    const aiResult = await this.aiJudgesService.evaluateSubmission(dto);
 
-    // 2. [방송] 방에 있는 모든 사람에게 결과 전송
-    this.server.to(roomId).emit('ai_judge_result', {
-      personaName: aiResult.personaName,
-      score: aiResult.score,
-      comment: aiResult.comment,
+    // C. [핵심] 병렬 심사 실행 (3번 호출)
+    const results = await this.aiJudgesService.evaluateMultiple(judgeNames, dto);
+
+    // D. 결과 방송
+    this.server.to(data.roomId).emit('judging_finished', {
+      results: results, // [{ personaName, score, comment }, ...]
     });
   }
 }

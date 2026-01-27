@@ -5,6 +5,7 @@ import { CreateRoomResponseDto } from './dto/create-room.response.dto';
 import { RoomsRepository } from './rooms.repository';
 import { Room, RoomConfig } from '../../common/types/room.type';
 import { redisKeys } from '../../common/constants/redis.keys';
+import { PERSONAS, JudgeConfig } from '../../modules/ai-judges/personas.constant';
 import { User, UserRole } from '../../common/types/user.type';
 import { generateUUIDToken, generateRoomId } from '../../common/utils/id.util';
 
@@ -147,6 +148,48 @@ export class RoomsService {
 
     return { updatedUser, users, roomUuid: user.roomUuid };
   }
+
+  /**
+   * 게임 시작 (임시 구현)
+   * 1. 심사위원 3명 랜덤 선정
+   * 2. Redis에 선정된 심사위원 이름 저장
+   * 3. 선정된 심사위원 정보 반환
+   */
+  async startGame(roomUuid: string) {
+    // 1. 방 상태 확인 (생략 가능)
+    const room = await this.roomsRepository.findById(roomUuid);
+    if (!room) throw new BadRequestException('방이 없습니다.');
+
+    // 2. 랜덤 심사위원 3명 선정 로직
+    // 원본 배열 복사 (원본 훼손 방지)
+    const tempPersonas = [...PERSONAS];
+    const selectedJudges: JudgeConfig[] = [];
+
+    // Fisher-Yates Shuffle 응용 (3개만 뽑고 종료)
+    for (let i = 0; i < 3; i++) {
+      if (tempPersonas.length === 0) break;
+
+      // 남은 것 중에서 랜덤 인덱스 선택
+      const randomIdx = Math.floor(Math.random() * tempPersonas.length);
+
+      // 선택된 요소를 결과 배열에 넣음
+      selectedJudges.push(tempPersonas[randomIdx]);
+
+      // 선택된 요소를 임시 배열에서 제거 (중복 방지)
+      tempPersonas.splice(randomIdx, 1);
+    }
+
+    // 3. 선정된 심사위원 이름(name) 목록 추출
+    const judgeNames = selectedJudges.map((judge) => judge.name);
+
+    // 4. Redis에 저장 (나중에 심사할 때 꺼내 쓰기 위함)
+    // Repository에 saveRoomJudges 메서드가 필요함
+    await this.roomsRepository.saveRoomJudges(roomUuid, judgeNames);
+
+    // 5. 프론트엔드에 보여줄 정보 반환 (이미지, 이름 등)
+    return selectedJudges;
+  }
+
   // 👇 leaveRoom 구현
   async leaveRoom(socketId: string): Promise<{ roomUuid: string; nickname: string } | null> {
     // 1. 소켓 ID로 방ID와 토큰 찾기
