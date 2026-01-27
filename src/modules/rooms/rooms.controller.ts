@@ -4,7 +4,7 @@ import type { CreateRoomDto } from './dto/create-room.dto';
 import type { CreateRoomResponseDto } from './dto/create-room.response.dto';
 import { RoomsService } from './rooms.service';
 
-@Controller('api/rooms')
+@Controller('rooms')
 export class RoomsController {
   constructor(private readonly roomsService: RoomsService) {}
 
