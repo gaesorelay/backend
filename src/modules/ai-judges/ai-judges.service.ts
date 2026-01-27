@@ -8,6 +8,7 @@ import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
 import { EvaluateSubmissionDto, PersonaResult } from './dto/judge.dto';
+import { AiJudgesRepository } from './ai-judges.repository';
 import { JudgeConfig, PERSONAS } from './personas.constant';
 
 @Injectable()
@@ -17,21 +18,64 @@ export class AiJudgeService {
   constructor(
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
+    private readonly aiJudgesRepository: AiJudgesRepository,
   ) {}
+
+  /**
+   * [신규] 심사위원 선정 및 저장 (RoomsService가 호출함)
+   */
+  async selectAndSaveJudges(roomUuid: string): Promise<JudgeConfig[]> {
+    const tempPersonas = [...PERSONAS];
+    const selectedJudges: JudgeConfig[] = [];
+
+    for (let i = 0; i < 3; i++) {
+      if (tempPersonas.length === 0) break;
+      const randomIdx = Math.floor(Math.random() * tempPersonas.length);
+      selectedJudges.push(tempPersonas[randomIdx]);
+      tempPersonas.splice(randomIdx, 1);
+    }
+
+    const judgeNames = selectedJudges.map((j) => j.name);
+    await this.aiJudgesRepository.saveSelectedJudges(roomUuid, judgeNames);
+
+    return selectedJudges;
+  }
+
+  /**
+   * [수정] 방 번호로 심사 진행
+   */
+  async evaluateRoom(roomUuid: string, dto: any): Promise<PersonaResult[]> {
+    const judgeNames = await this.aiJudgesRepository.getSelectedJudges(roomUuid);
+
+    if (!judgeNames || judgeNames.length === 0) {
+      throw new NotFoundException('선정된 심사위원이 없습니다.');
+    }
+
+    // 이름으로 JudgeConfig 객체 찾기
+    const targetJudges = judgeNames.map((name) => {
+      const found = PERSONAS.find((p) => p.name === name);
+      if (!found) throw new NotFoundException(`심사위원 데이터 없음: ${name}`);
+      return found;
+    });
+
+    // 👇 [수정] map 내부 변수명 변경 (persona -> judge)
+    const promises = targetJudges.map((judge) => this.evaluateSingle(judge, dto));
+
+    return await Promise.all(promises);
+  }
 
   /**
    * [내부용] 단일 심사 함수
    * 랜덤 선택 로직을 제거하고, 파라미터로 받은 persona로 심사합니다.
    */
   private async evaluateSingle(
-    JudgeConfig: JudgeConfig,
+    judge: JudgeConfig,
     dto: EvaluateSubmissionDto,
   ): Promise<PersonaResult> {
     const gmsKey = this.configService.get<string>('GMS_API_KEY');
     const url = 'https://gms.ssafy.io/gmsapi/api.openai.com/v1/chat/completions';
 
     // 문맥 데이터 조립 (기존 로직 유지한다고 가정)
-    // 이 함수는 질문자님의 코드에 포함되어 있지 않아, 있다고 가정하고 작성합니다.
     const contextPrompt = this.buildContextPrompt(dto);
 
     try {
@@ -43,8 +87,8 @@ export class AiJudgeService {
             messages: [
               {
                 role: 'system',
-                // 3번 수정사항: 선택된 persona의 텍스트 사용
-                content: `${JudgeConfig.persona}
+                // 3번 수정사항: 선택된 judge의 텍스트 사용
+                content: `${judge.persona}
                           
                           [평가 기준]
                           1. 제시된 '장르'의 분위기를 잘 살렸는가?
@@ -76,46 +120,16 @@ export class AiJudgeService {
       const result = JSON.parse(content);
 
       return {
-        personaName: JudgeConfig.name, // 3번 수정사항: name 사용
+        personaName: judge.name, // 3번 수정사항: name 사용
         score: result.score,
         comment: result.comment,
       };
     } catch (error: any) {
-      this.logger.error(`${JudgeConfig.name} 평가 실패`, error.response?.data || error.message);
+      this.logger.error(`${judge.name} 평가 실패`, error.response?.data || error.message);
       // 하나가 실패해도 전체가 죽지 않게 하려면 여기서 기본값을 리턴할 수도 있음
       // 현재는 에러를 던지도록 유지
-      throw new InternalServerErrorException(`${JudgeConfig.name} AI 평가 중 오류 발생`);
+      throw new InternalServerErrorException(`${judge.name} AI 평가 중 오류 발생`);
     }
-  }
-
-  /**
-   * [메인] 병렬 심사 요청 함수
-   * 저장된 심사위원 이름 목록(judgeNames)과 게임 데이터(dto)를 받아 병렬로 처리합니다.
-   */
-  async evaluateMultiple(
-    judgeNames: string[],
-    dto: EvaluateSubmissionDto,
-  ): Promise<PersonaResult[]> {
-    this.logger.log(`병렬 심사 시작: 심사위원 ${judgeNames.join(', ')}`);
-
-    // 1. 이름으로 실제 페르소나 객체 찾기
-    const targetPersonas = judgeNames.map((name) => {
-      const found = PERSONAS.find((p) => p.name === name);
-      if (!found) {
-        throw new NotFoundException(`페르소나를 찾을 수 없습니다: ${name}`);
-      }
-      return found;
-    });
-
-    // 2. Promise.all로 병렬 요청 생성
-    const promises = targetPersonas.map(
-      (persona) => this.evaluateSingle(persona, dto), // 아래 분리된 함수 호출
-    );
-
-    // 3. 동시에 실행하고 결과 기다림
-    const results = await Promise.all(promises);
-
-    return results;
   }
 
   private buildContextPrompt(dto: EvaluateSubmissionDto): string {
