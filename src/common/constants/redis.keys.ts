@@ -11,6 +11,7 @@ export const redisKeys = {
   socketMap: (socketId: string) => `socket:${socketId}`,
 
   roomGameState: (roomUuid: string) => `room:${roomUuid}:game`,
+  roomTimer: (roomUuid: string, phase: string) => `room:${roomUuid}:timer:${phase}`,
 
   roomVote: (roomUuid: string) => `room:${roomUuid}:vote`,
 };
