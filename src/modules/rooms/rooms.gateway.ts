@@ -9,6 +9,7 @@ import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
 import { RoomsService } from './rooms.service';
 import { JoinRoomDto } from './dto/join-room.dto';
+import { LeaveTeamDto } from './dto/leave-team.dto';
 import { User } from '../../common/types/user.type';
 
 @WebSocketGateway({
@@ -54,7 +55,7 @@ export class RoomsGateway {
       // ⭐️ [변경] 단순히 "누가 왔다"가 아니라, "최신 유저 리스트"를 방 전체에 뿌립니다.
       // 이를 위해선 Service에 getUsersInRoom 함수가 있어야 합니다.
       const users = await this.roomsService.getUsersInRoom(data.roomId);
-      
+
       this.server.to(data.roomId).emit('lobby_updated', {
         users: users,
         // 필요하다면 여기에 roomConfig 같은 방 정보도 같이 보낼 수 있음
@@ -75,14 +76,14 @@ export class RoomsGateway {
   @SubscribeMessage('request_room_info')
   async handleRequestRoomInfo(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { roomId: string }
+    @MessageBody() data: { roomId: string },
   ) {
     this.logger.log(`📥 유저 리스트 요청: ${data.roomId} (by ${client.id})`);
-    
+
     try {
       // 최신 유저 리스트 조회
       const users = await this.roomsService.getUsersInRoom(data.roomId);
-      
+
       // 요청한 사람에게만(client.emit) 최신 리스트 전송
       client.emit('lobby_updated', {
         users: users,
@@ -153,6 +154,45 @@ export class RoomsGateway {
       };
     } catch (error) {
       this.logger.error(`join_team failed: ${error.message}`);
+      return { status: 'error', message: error.message };
+    }
+  }
+
+  /**
+   * 5. 팀 슬롯 퇴장 (PLAYER -> AUDIENCE)
+   */
+  @SubscribeMessage('leave_team')
+  async handleLeaveTeam(@ConnectedSocket() client: Socket, @MessageBody() data: LeaveTeamDto) {
+    this.logger.log(
+      `leave_team request: socket ${client.id}, target ${data.public_user_id}, team ${data.team}, slot ${data.slot_index}`,
+    );
+
+    try {
+      const { updatedUser, users, roomUuid } = await this.roomsService.leaveTeam(
+        client.id,
+        data.public_user_id,
+        data.slot_index,
+        data.team,
+      );
+
+      this.server.to(roomUuid).emit('lobby_updated', {
+        users,
+        updatedUser,
+      });
+
+      return {
+        status: 'success',
+        data: {
+          updatedUser: {
+            publicUserId: updatedUser.publicUserId,
+            team: updatedUser.team ?? 'NONE',
+            role: updatedUser.role,
+            slotIndex: updatedUser.slotIndex,
+          },
+        },
+      };
+    } catch (error) {
+      this.logger.error(`leave_team failed: ${error.message}`);
       return { status: 'error', message: error.message };
     }
   }

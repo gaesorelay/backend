@@ -353,6 +353,195 @@ describe('RoomsService.joinRoom', () => {
   });
 });
 
+describe('RoomsService.leaveTeam', () => {
+  let service: RoomsService;
+  let roomsRepository: {
+    getMappingBySocketId: jest.Mock;
+    findUserByToken: jest.Mock;
+    findAllUsersInRoom: jest.Mock;
+    saveUser: jest.Mock;
+  };
+
+  const roomUuid = 'ROOM123';
+
+  beforeEach(() => {
+    roomsRepository = {
+      getMappingBySocketId: jest.fn(),
+      findUserByToken: jest.fn(),
+      findAllUsersInRoom: jest.fn(),
+      saveUser: jest.fn(),
+    };
+    service = new RoomsService(roomsRepository as unknown as any);
+  });
+
+  it('allows host to remove another user from team', async () => {
+    // 1) 방장(요청자)과 대상 유저 준비
+    const requester: User = {
+      userToken: 'token-host',
+      publicUserId: 1,
+      currentSocketId: 'socket1',
+      roomUuid,
+      nickname: 'host',
+      role: 'PLAYER',
+      isHost: true,
+      team: 'A',
+      slotIndex: 0,
+      avatarId: 1,
+      isReady: false,
+    };
+    const target: User = {
+      userToken: 'token-user',
+      publicUserId: 2,
+      currentSocketId: 'socket2',
+      roomUuid,
+      nickname: 'user',
+      role: 'PLAYER',
+      isHost: false,
+      team: 'A',
+      slotIndex: 1,
+      avatarId: 2,
+      isReady: false,
+    };
+
+    // 2) 소켓 매핑과 유저 목록 mock
+    roomsRepository.getMappingBySocketId.mockResolvedValue({
+      roomUuid,
+      userToken: requester.userToken,
+    });
+    roomsRepository.findUserByToken.mockResolvedValue(requester);
+    roomsRepository.findAllUsersInRoom.mockResolvedValue([requester, target]);
+
+    // 3) leaveTeam 실행 (방장이 다른 유저 퇴장)
+    const result = await service.leaveTeam('socket1', 2, 1, 'A');
+
+    // 4) 대상 유저가 관전자로 전환되는지 확인
+    expect(roomsRepository.saveUser).toHaveBeenCalledTimes(1);
+    expect(roomsRepository.saveUser.mock.calls[0][0]).toMatchObject({
+      publicUserId: 2,
+      role: 'AUDIENCE',
+      team: null,
+      slotIndex: 1,
+    });
+    expect(result.updatedUser.publicUserId).toBe(2);
+    expect(result.updatedUser.role).toBe('AUDIENCE');
+    expect(result.updatedUser.team).toBeNull();
+    expect(result.roomUuid).toBe(roomUuid);
+  });
+
+  it('allows user to remove self from team', async () => {
+    // 1) 요청자 = 대상 유저 (본인)
+    const requester: User = {
+      userToken: 'token-user',
+      publicUserId: 2,
+      currentSocketId: 'socket1',
+      roomUuid,
+      nickname: 'user',
+      role: 'PLAYER',
+      isHost: false,
+      team: 'B',
+      slotIndex: 2,
+      avatarId: 2,
+      isReady: false,
+    };
+
+    roomsRepository.getMappingBySocketId.mockResolvedValue({
+      roomUuid,
+      userToken: requester.userToken,
+    });
+    roomsRepository.findUserByToken.mockResolvedValue(requester);
+    roomsRepository.findAllUsersInRoom.mockResolvedValue([requester]);
+
+    // 2) 본인이 leaveTeam 호출
+    const result = await service.leaveTeam('socket1', 2, 2, 'B');
+
+    // 3) 관전자로 전환되는지 확인
+    expect(roomsRepository.saveUser).toHaveBeenCalledTimes(1);
+    expect(result.updatedUser.role).toBe('AUDIENCE');
+    expect(result.updatedUser.team).toBeNull();
+    expect(result.updatedUser.slotIndex).toBe(2);
+  });
+
+  it('rejects when non-host removes other user', async () => {
+    // 1) 요청자는 방장 아님 + 대상은 다른 유저
+    const requester: User = {
+      userToken: 'token-user1',
+      publicUserId: 1,
+      currentSocketId: 'socket1',
+      roomUuid,
+      nickname: 'user1',
+      role: 'PLAYER',
+      isHost: false,
+      team: 'A',
+      slotIndex: 0,
+      avatarId: 1,
+      isReady: false,
+    };
+    const target: User = {
+      userToken: 'token-user2',
+      publicUserId: 2,
+      currentSocketId: 'socket2',
+      roomUuid,
+      nickname: 'user2',
+      role: 'PLAYER',
+      isHost: false,
+      team: 'A',
+      slotIndex: 1,
+      avatarId: 2,
+      isReady: false,
+    };
+
+    roomsRepository.getMappingBySocketId.mockResolvedValue({
+      roomUuid,
+      userToken: requester.userToken,
+    });
+    roomsRepository.findUserByToken.mockResolvedValue(requester);
+    roomsRepository.findAllUsersInRoom.mockResolvedValue([requester, target]);
+
+    // 2) 권한 없으므로 예외 발생
+    await expect(service.leaveTeam('socket1', 2, 1, 'A')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
+
+  it('rejects when team input is invalid', async () => {
+    // 1) 요청자는 본인 (형식 검증만 확인)
+    const requester: User = {
+      userToken: 'token-user',
+      publicUserId: 2,
+      currentSocketId: 'socket1',
+      roomUuid,
+      nickname: 'user',
+      role: 'PLAYER',
+      isHost: false,
+      team: 'A',
+      slotIndex: 1,
+      avatarId: 2,
+      isReady: false,
+    };
+
+    roomsRepository.getMappingBySocketId.mockResolvedValue({
+      roomUuid,
+      userToken: requester.userToken,
+    });
+    roomsRepository.findUserByToken.mockResolvedValue(requester);
+    roomsRepository.findAllUsersInRoom.mockResolvedValue([requester]);
+
+    // 2) team 값이 A/B가 아니면 에러
+    await expect(service.leaveTeam('socket1', 2, 1, 'C')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
+
+  it('throws when mapping is missing', async () => {
+    // 1) 소켓 매핑 없음
+    roomsRepository.getMappingBySocketId.mockResolvedValue(null);
+
+    await expect(service.leaveTeam('socket1', 1, 0, 'A')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+});
+
 describe('RoomsService.setUserReady', () => {
   let service: RoomsService;
   let roomsRepository: {

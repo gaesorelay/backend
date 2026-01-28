@@ -261,7 +261,6 @@
 //   }
 // }
 
-
 import { Injectable, Inject, NotFoundException, BadRequestException } from '@nestjs/common';
 import { CreateRoomDto } from './dto/create-room.dto';
 import { CreateRoomResponseDto } from './dto/create-room.response.dto';
@@ -277,7 +276,7 @@ export class RoomsService {
   async createRoom(dto: CreateRoomDto): Promise<CreateRoomResponseDto> {
     const roomId = generateRoomId();
     const ownerToken = generateUUIDToken();
-    
+
     const room: Room = {
       roomUuid: roomId,
       ownerUserToken: ownerToken,
@@ -286,7 +285,7 @@ export class RoomsService {
       config: dto.config,
       createdAt: Date.now(),
     };
-    
+
     const TTL_SECONDS = 60 * 60 * 12; // 12시간
     await this.roomsRepository.save(room, TTL_SECONDS);
 
@@ -317,11 +316,11 @@ export class RoomsService {
       const existingUser = await this.roomsRepository.findUserByToken(roomUuid, userToken);
       if (existingUser) {
         console.log(`♻️ 재접속 감지: ${nickname} (${userToken})`);
-        
+
         await this.roomsRepository.updateUserSocket(roomUuid, userToken, socketId);
         await this.roomsRepository.saveSocketMapping(socketId, roomUuid, userToken);
         await this.roomsRepository.clearUserTTL(roomUuid, userToken);
-        
+
         return existingUser;
       }
     }
@@ -330,7 +329,7 @@ export class RoomsService {
 
     const currentCount = await this.roomsRepository.getUserCount(roomUuid);
     // config에 따라 최대 인원 계산 (기본값 처리)
-    const maxUser = room.config.maxPlayers || 8; 
+    const maxUser = room.config.maxPlayers || 8;
 
     if (currentCount >= maxUser) {
       throw new BadRequestException('방이 꽉 찼습니다.');
@@ -349,7 +348,7 @@ export class RoomsService {
     // 호스트면 방 생성 때 만든 토큰 사용, 아니면 새로 발급
     const newUserToken = isHost ? room.ownerUserToken : generateUUIDToken();
     const publicUserId = await this.roomsRepository.nextPublicUserId(roomUuid);
-    
+
     // 아바타 랜덤 설정
     const resolvedAvatarId = avatarId ?? Math.floor(Math.random() * 5) + 1;
 
@@ -359,7 +358,7 @@ export class RoomsService {
       currentSocketId: socketId,
       roomUuid: roomUuid,
       nickname: nickname,
-      
+
       // ✨ 변경된 필드들
       role: role,
       isHost: isHost, // boolean 값
@@ -390,9 +389,10 @@ export class RoomsService {
     };
   }
 
-  async getUsersInRoom(roomUuid: string): Promise<User[]> {  //방의 유저 정보 조회
-  return this.roomsRepository.findAllUsersInRoom(roomUuid);
-}
+  async getUsersInRoom(roomUuid: string): Promise<User[]> {
+    //방의 유저 정보 조회
+    return this.roomsRepository.findAllUsersInRoom(roomUuid);
+  }
 
   async setUserReady(socketId: string, isReady: boolean) {
     const mapping = await this.roomsRepository.getMappingBySocketId(socketId);
@@ -450,8 +450,62 @@ export class RoomsService {
     // ⭐️ [변경] 팀에 배정되면 역할은 무조건 'PLAYER'가 됨
     const updatedUser: User = {
       ...target,
-      role: 'PLAYER', 
+      role: 'PLAYER',
       team,
+      slotIndex,
+    };
+
+    await this.roomsRepository.saveUser(updatedUser);
+
+    const updatedUsers = users.map((user) =>
+      user.publicUserId === targetPublicUserId ? updatedUser : user,
+    );
+
+    return { updatedUser, users: updatedUsers, roomUuid: mapping.roomUuid };
+  }
+
+  /**
+   * 🚪 팀 슬롯 퇴장 (PLAYER -> AUDIENCE)
+   * - 본인 또는 방장만 퇴장 처리 가능
+   * - 팀은 null로 초기화, role은 AUDIENCE로 전환
+   */
+  async leaveTeam(
+    socketId: string,
+    targetPublicUserId: number,
+    slotIndex: number,
+    teamInput: string,
+  ): Promise<{ updatedUser: User; users: User[]; roomUuid: string }> {
+    // 1) 요청자 식별
+    const mapping = await this.roomsRepository.getMappingBySocketId(socketId);
+    if (!mapping) throw new NotFoundException('User not found.');
+
+    const requester = await this.roomsRepository.findUserByToken(
+      mapping.roomUuid,
+      mapping.userToken,
+    );
+    if (!requester) throw new NotFoundException('User not found.');
+
+    // 2) 권한 체크: 본인이 아니면 방장만 가능
+    if (requester.publicUserId !== targetPublicUserId && !requester.isHost) {
+      throw new BadRequestException('Only host can remove other users.');
+    }
+
+    // 3) 입력된 team 값은 A/B만 허용 (형식 검증용)
+    if (teamInput !== 'A' && teamInput !== 'B') {
+      throw new BadRequestException('Invalid team. Use "A" or "B".');
+    }
+
+    // 4) 대상 유저 조회
+    const users = await this.roomsRepository.findAllUsersInRoom(mapping.roomUuid);
+    const target = users.find((user) => user.publicUserId === targetPublicUserId);
+    if (!target) throw new NotFoundException('Target user not found.');
+
+    // 5) 팀에서 내보내고 관전자로 전환
+    const updatedUser: User = {
+      ...target,
+      role: 'AUDIENCE',
+      team: null,
+      // 명세 상 slotIndex가 유지되므로 전달받은 값으로 보존
       slotIndex,
     };
 
