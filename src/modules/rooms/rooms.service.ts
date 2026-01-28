@@ -462,6 +462,12 @@ export class RoomsService {
     const target = users.find((user) => user.publicUserId === targetPublicUserId);
     if (!target) throw new NotFoundException('Target user not found.');
 
+    // 🚨 [추가] 해당 팀의 해당 슬롯이 비어있는지 확인
+    const isSlotTaken = users.some((u) => u.team === team && u.slotIndex === slotIndex);
+    if (isSlotTaken) {
+      throw new BadRequestException('이미 다른 유저가 있는 자리입니다.');
+    }
+
     // ⭐️ [변경] 팀에 배정되면 역할은 무조건 'PLAYER'가 됨
     const updatedUser: User = {
       ...target,
