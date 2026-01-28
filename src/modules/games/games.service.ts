@@ -32,4 +32,13 @@ export class GamesService {
     console.log(`🎮 [Game Init] 방 ${roomUuid} 게임 상태 생성 완료 (데이터 비어있음)`);
     return initialState;
   }
+
+  // 외부(AiJudgeService 등)에서 호출할 메서드
+  async updateGameJudges(roomUuid: string, judgeIds: number[]) {
+    await this.gamesRepository.updateJudges(roomUuid, judgeIds);
+  }
+
+  async getJudgeIds(roomUuid: string): Promise<number[]> {
+    return this.gamesRepository.getGameJudgeIds(roomUuid);
+  }
 }

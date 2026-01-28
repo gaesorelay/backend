@@ -10,6 +10,7 @@ import { firstValueFrom } from 'rxjs';
 import { EvaluateSubmissionDto, PersonaResult } from './dto/judge.dto';
 import { AiJudgesRepository } from './ai-judges.repository';
 import { JudgeConfig, PERSONAS } from './personas.constant';
+import { GamesService } from '../games/games.service';
 
 @Injectable()
 export class AiJudgeService {
@@ -19,6 +20,7 @@ export class AiJudgeService {
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
     private readonly aiJudgesRepository: AiJudgesRepository,
+    private readonly gamesService: GamesService,
   ) {}
 
   /**
@@ -35,24 +37,33 @@ export class AiJudgeService {
       tempPersonas.splice(randomIdx, 1);
     }
 
-    const judgeNames = selectedJudges.map((j) => j.name);
-    await this.aiJudgesRepository.saveSelectedJudges(roomUuid, judgeNames);
+    const judgeIds = selectedJudges.map((j) => j.id);
+    // 3. ⭐️ [변경] 직접 저장 안 하고 GamesService에게 위임!
+    await this.gamesService.updateGameJudges(roomUuid, judgeIds);
 
     return selectedJudges;
+  }
+
+  // ⭐️ [수정] 심사위원 명단 조회
+  async getSelectedJudges(roomUuid: string): Promise<number[]> {
+    // 1. GamesService에게 ID 리스트 요청
+    const judgeIds = await this.gamesService.getJudgeIds(roomUuid); // [0, 2, 4]
+
+    return judgeIds;
   }
 
   /**
    * [수정] 방 번호로 심사 진행
    */
   async evaluateRoom(roomUuid: string, dto: any): Promise<PersonaResult[]> {
-    const judgeNames = await this.aiJudgesRepository.getSelectedJudges(roomUuid);
+    const judgeIds = await this.getSelectedJudges(roomUuid);
 
-    if (!judgeNames || judgeNames.length === 0) {
+    if (!judgeIds || judgeIds.length === 0) {
       throw new NotFoundException('선정된 심사위원이 없습니다.');
     }
 
-    // 1-2. 이름 -> JudgeConfig 객체로 변환
-    const targetJudges = this.mapNamesToJudges(judgeNames);
+    // 1-2. ID -> JudgeConfig 객체로 변환
+    const targetJudges = this.mapIdsToJudges(judgeIds);
 
     // 1-3. 병렬 심사 위임 (코드 재사용!)
     return this.evaluateMultiple(targetJudges, dto);
@@ -158,11 +169,11 @@ export class AiJudgeService {
     `;
   }
 
-  // [Helper] 이름 배열을 JudgeConfig 배열로 변환하는 헬퍼 함수
-  mapNamesToJudges(names: string[]): JudgeConfig[] {
-    return names.map((name) => {
-      const found = PERSONAS.find((p) => p.name === name);
-      if (!found) throw new NotFoundException(`심사위원 데이터 없음: ${name}`);
+  // [Helper] ID 배열을 JudgeConfig 배열로 변환하는 헬퍼 함수
+  mapIdsToJudges(ids: number[]): JudgeConfig[] {
+    return ids.map((id) => {
+      const found = PERSONAS.find((p) => p.id === id);
+      if (!found) throw new NotFoundException(`심사위원 데이터 없음: ${id}`);
       return found;
     });
   }

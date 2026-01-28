@@ -31,4 +31,35 @@ export class GamesRepository {
     const key = redisKeys.roomGameState(roomUuid);
     await this.client.del(key);
   }
+
+  /**
+   * ⭐️ [신규] 심사위원 ID 리스트 업데이트
+   * - 게임 상태를 가져와서 aiJudgeIDs만 변경하고 저장
+   */
+  async updateJudges(roomUuid: string, judgeIds: number[]): Promise<void> {
+    const key = redisKeys.roomGameState(roomUuid);
+    const data = await this.client.get(key);
+
+    if (!data) {
+      console.warn(`⚠️ [GamesRepo] 게임 상태 없음. 심사위원 저장 실패: ${roomUuid}`);
+      return;
+    }
+
+    const state: GameState = JSON.parse(data);
+    state.aiJudgeIDs = judgeIds; // 필드 업데이트
+
+    // TTL 유지(KEEPTTL)하며 저장
+    await this.client.set(key, JSON.stringify(state), 'KEEPTTL');
+  }
+
+  // ⭐️ [신규] 게임에 설정된 심사위원 ID 리스트 조회
+  async getGameJudgeIds(roomUuid: string): Promise<number[]> {
+    const key = redisKeys.roomGameState(roomUuid);
+    const data = await this.client.get(key);
+
+    if (!data) return []; // 게임 정보가 없으면 빈 배열
+
+    const state: GameState = JSON.parse(data);
+    return state.aiJudgeIDs || []; // number[] 반환
+  }
 }

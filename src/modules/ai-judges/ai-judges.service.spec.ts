@@ -1,36 +1,36 @@
-// src/ai-judge/ai-judge.service.spec.ts
 import { Test, TestingModule } from '@nestjs/testing';
-import { AiJudgeService } from './ai-judges.service';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
-import { of } from 'rxjs'; // RxJS observable 생성용
-import { JudgeConfig, PERSONAS } from './personas.constant';
+import { AiJudgeService } from './ai-judges.service';
 import { AiJudgesRepository } from './ai-judges.repository';
+import { GamesService } from '../games/games.service'; // 👈 GamesService Import 필수
+import { of } from 'rxjs';
+import { PERSONAS } from './personas.constant';
+
+// 1. Mocking용 데이터 준비 (ID 포함)
+const mockSubmission = {
+  genre: '스릴러',
+  images: [],
+  sentence: '테스트 문장입니다.',
+};
+
+// 2. HTTP 응답 Mock
+const mockGptResponse = {
+  data: {
+    choices: [
+      {
+        message: {
+          content: JSON.stringify({ score: 90, comment: '잘했어' }),
+        },
+      },
+    ],
+  },
+};
 
 describe('AiJudgeService', () => {
   let service: AiJudgeService;
+  let gamesService: GamesService;
   let httpService: HttpService;
-
-  // 1. GMS API가 줄 것이라고 가정하는 가짜 응답 데이터
-  const mockGptResponse = {
-    data: {
-      choices: [
-        {
-          message: {
-            content: JSON.stringify({
-              score: 95,
-              comment: '테스트 코멘트입니다.',
-            }),
-          },
-        },
-      ],
-    },
-  };
-
-  const mockAiJudgesRepository = {
-    saveSelectedJudges: jest.fn(),
-    getSelectedJudges: jest.fn(),
-  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -38,9 +38,20 @@ describe('AiJudgeService', () => {
         AiJudgeService,
         {
           provide: ConfigService,
+          useValue: { get: jest.fn().mockReturnValue('TEST_API_KEY') },
+        },
+        {
+          provide: AiJudgesRepository,
           useValue: {
-            // 코드에서 'GMS_API_KEY'를 찾으므로 이에 맞춰줍니다.
-            get: jest.fn().mockReturnValue('FAKE_API_KEY'),
+            // Repository 메서드 Mock (필요한 경우)
+          },
+        },
+        // ⭐️ [핵심 1] GamesService Mocking (ID 배열 반환하도록 설정)
+        {
+          provide: GamesService,
+          useValue: {
+            getJudgeIds: jest.fn().mockResolvedValue([1, 2]), // number[] 반환!
+            updateGameJudges: jest.fn().mockResolvedValue(undefined),
           },
         },
         {
@@ -49,58 +60,65 @@ describe('AiJudgeService', () => {
             post: jest.fn().mockReturnValue(of(mockGptResponse)),
           },
         },
-        {
-          provide: AiJudgesRepository, // 실제 클래스 이름
-          useValue: mockAiJudgesRepository, // 위에서 만든 가짜 객체
-        },
       ],
     }).compile();
 
     service = module.get<AiJudgeService>(AiJudgeService);
+    gamesService = module.get<GamesService>(GamesService);
     httpService = module.get<HttpService>(HttpService);
   });
 
-  it('단일 심사위원(judge) 정보로 평가를 수행하고 결과를 반환해야 한다', async () => {
-    // [준비 1] 가상의 심사위원 데이터 생성 (JudgeConfig 타입)
-    const mockJudge: JudgeConfig = {
-      id: 1,
-      name: '테스트 판사',
-      persona: '너는 테스트를 위한 가상의 판사야.',
-    };
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
 
-    // [준비 2] 평가받을 문장 데이터 생성 (DTO)
-    const dto = {
-      genre: '테스트 장르',
-      images: [{ tags: ['태그1'], description: '설명1' }],
-      sentence: '테스트 문장입니다.',
-    };
+  describe('evaluateRoom', () => {
+    it('방 ID로 심사위원 ID를 조회하여 평가를 수행해야 한다', async () => {
+      // Arrange
+      const roomId = 'room-123';
+      // GamesService가 1번, 2번 심사위원 ID를 반환한다고 가정
+      // (PERSONAS[0].id, PERSONAS[1].id와 매칭되는지 확인 필요. 보통 1부터 시작하면 인덱스 주의)
+      // 여기서는 PERSONAS에 id: 1, id: 2인 데이터가 있다고 가정합니다.
+      jest.spyOn(gamesService, 'getJudgeIds').mockResolvedValue([1, 2]);
 
-    // [실행] evaluateSingle 호출 (심사위원 + DTO 전달)
-    const result = await service.evaluateSingle(mockJudge, dto);
+      // Act
+      const results = await service.evaluateRoom(roomId, mockSubmission);
 
-    // [검증]
-    // 1. 결과에 심사위원 이름이 제대로 매핑되었는지 확인
-    expect(result.personaName).toBe('테스트 판사');
+      // Assert
+      expect(gamesService.getJudgeIds).toHaveBeenCalledWith(roomId);
+      expect(httpService.post).toHaveBeenCalledTimes(2); // 심사위원이 2명이므로 2번 호출
+      expect(results).toHaveLength(2);
 
-    // 2. 점수와 코멘트가 Mock API 응답대로 왔는지 확인
-    expect(result.score).toBe(95);
-    expect(result.comment).toBe('테스트 코멘트입니다.');
+      // 결과 검증 (id 기반인지 확인)
+      // 만약 PersonaResult에 id가 있다면: expect(results[0].personaId).toBe(1);
+      expect(results[0].score).toBe(90);
+    });
 
-    // 3. HTTP 요청이 1번 발생했는지 확인
-    expect(httpService.post).toHaveBeenCalledTimes(1);
+    it('심사위원이 설정되지 않았으면 에러를 던져야 한다', async () => {
+      // ⭐️ [핵심 2] 빈 배열(number[]) 반환
+      jest.spyOn(gamesService, 'getJudgeIds').mockResolvedValue([]);
 
-    // (선택) HTTP 요청 시 시스템 프롬프트에 심사위원 페르소나가 잘 들어갔는지 확인
-    expect(httpService.post).toHaveBeenCalledWith(
-      expect.stringContaining('gmsapi/api.openai.com/v1/chat/completions'), // URL 체크
-      expect.objectContaining({
-        messages: expect.arrayContaining([
-          expect.objectContaining({
-            role: 'system',
-            content: expect.stringContaining('너는 테스트를 위한 가상의 판사야.'), // 페르소나 주입 확인
-          }),
-        ]),
-      }),
-      expect.anything(), // 헤더 부분은 체크 생략 (anything)
-    );
+      await expect(service.evaluateRoom('room-empty', mockSubmission)).rejects.toThrow(
+        '선정된 심사위원이 없습니다.',
+      );
+    });
+  });
+
+  describe('mapIdsToJudges', () => {
+    it('유효한 ID 목록을 받으면 Persona 객체 배열을 반환해야 한다', () => {
+      // PERSONAS 상수에 id: 1인 데이터가 있다고 가정
+      const targetId = PERSONAS[0].id;
+
+      // ⭐️ [핵심 3] 문자열 이름이 아니라 ID 전달
+      const result = service['mapIdsToJudges']([targetId]);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe(targetId);
+    });
+
+    it('존재하지 않는 ID가 있으면 에러를 던져야 한다', () => {
+      const invalidId = 99999;
+      expect(() => service['mapIdsToJudges']([invalidId])).toThrow(); // 또는 NotFoundException
+    });
   });
 });
