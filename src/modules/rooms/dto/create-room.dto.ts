@@ -4,6 +4,5 @@
 export interface CreateRoomDto {
   title: string;
   config: RoomConfig;
-  nickname: string;
   avatarId: number;
 }
