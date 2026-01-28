@@ -265,7 +265,7 @@ import { Injectable, Inject, NotFoundException, BadRequestException } from '@nes
 import { CreateRoomDto } from './dto/create-room.dto';
 import { CreateRoomResponseDto } from './dto/create-room.response.dto';
 import { RoomsRepository } from './rooms.repository';
-import { Room } from './types/room.type';
+import { Room, RoomStatus } from './types/room.type';
 import { User, UserRole, UserTeam } from '../users/types/user.type'; // 🚨 types/user.type.ts가 수정되어 있어야 함
 import { generateUUIDToken, generateRoomId } from '../../common/utils/id.util';
 import { GamesService } from '../games/games.service';
@@ -391,6 +391,26 @@ export class RoomsService {
       ...room,
       currentUserCount: currentCount,
     };
+  }
+
+  async getRoomById(roomUuid: string): Promise<Room> {
+    const room = await this.roomsRepository.findById(roomUuid);
+    if (!room) {
+      throw new NotFoundException('존재하지 않는 방입니다.');
+    }
+    return room;
+  }
+
+  async updateRoomStatus(roomUuid: string, status: RoomStatus): Promise<Room> {
+    const room = await this.roomsRepository.findById(roomUuid);
+    if (!room) {
+      throw new NotFoundException('존재하지 않는 방입니다.');
+    }
+
+    room.status = status;
+    await this.roomsRepository.save(room);
+
+    return room;
   }
 
   async getUsersInRoom(roomUuid: string): Promise<User[]> {

@@ -1,4 +1,4 @@
-import {
+﻿import {
   WebSocketGateway,
   WebSocketServer,
   SubscribeMessage,
@@ -10,16 +10,18 @@ import { Logger } from '@nestjs/common';
 import { RoomsService } from './rooms.service';
 import { JoinRoomDto } from './dto/join-room.dto';
 import { LeaveTeamDto } from './dto/leave-team.dto';
-import { Room, RoomConfig } from './types/room.type';
+import { RoomConfig } from './types/room.type';
 import { KickUserDto } from './dto/kick-user.dto';
 import { ChatDto } from './dto/chat.dto';
 import { User } from '../users/types/user.type';
 import { AiJudgeService } from '../ai-judges/ai-judges.service';
+import { GamesService } from '../games/games.service';
+import { Phase } from '../timer/timer.types';
 
 @WebSocketGateway({
   namespace: 'game',
   cors: {
-    origin: true, //['http://localhost:5173'], 실제 배포 시에는 프론트엔드 도메인으로 제한해야 함
+    origin: true, // 실제 배포 시에는 프론트엔드 도메인으로 제한
     credentials: true,
   },
 })
@@ -30,10 +32,11 @@ export class RoomsGateway {
   constructor(
     private readonly roomsService: RoomsService,
     private readonly aiJudgeService: AiJudgeService,
+    private readonly gamesService: GamesService,
   ) {}
 
   /**
-   * 1. 방 입장 (Setup -> GameRoom 진입 시)
+   * 1. 방 입장 (Setup -> GameRoom 진입)
    */
   @SubscribeMessage('join_room')
   async handleJoinRoom(
@@ -41,7 +44,7 @@ export class RoomsGateway {
     @MessageBody()
     data: JoinRoomDto,
   ) {
-    this.logger.log(`🔍 join_room 요청: 방=${data.roomId}, 닉네임=${data.nickname}`);
+    this.logger.log(`join_room 요청: 방 ${data.roomId}, 닉네임 ${data.nickname}`);
 
     try {
       const user: User = await this.roomsService.joinRoom(
@@ -52,57 +55,54 @@ export class RoomsGateway {
         data.userToken,
       );
 
-      // 소켓을 해당 방 채널에 조인
+      // 해당 방 소켓 룸 join
       client.join(data.roomId);
 
       this.logger.log(
-        `✅ 입장 성공: ${user.nickname} (Token: ${user.userToken}, Socket: ${client.id})`,
+        `입장 성공: ${user.nickname} (Token: ${user.userToken}, Socket: ${client.id})`,
       );
 
-      // ⭐️ [변경] 단순히 "누가 왔다"가 아니라, "최신 유저 리스트"를 방 전체에 뿌립니다.
-      // 이를 위해선 Service에 getUsersInRoom 함수가 있어야 합니다.
+      // 최신 유저 목록 브로드캐스트
       const users = await this.roomsService.getUsersInRoom(data.roomId);
 
       this.server.to(data.roomId).emit('lobby_updated', {
         users: users,
-        // 필요하다면 여기에 roomConfig 같은 방 정보도 같이 보낼 수 있음
       });
 
       this.server.to(data.roomId).emit('chat_message', {
         nickname: 'SYSTEM',
         message: `${user.nickname}님이 입장했습니다.`,
-        type: 'system', // 프론트에서 회색으로 표시
+        type: 'system', // 시스템 메시지
       });
 
-      // 요청자에게는 내 정보를 리턴 (콜백용)
+      // 요청자에게 응답 반환
       return { status: 'success', data: user };
     } catch (error) {
-      this.logger.error(`❌ 입장 실패: ${error.message}`);
+      this.logger.error(`입장 실패: ${error.message}`);
       return { status: 'error', message: error.message };
     }
   }
 
   /**
-   * 2. 방 정보/유저리스트 요청 (새로고침, 게스트 입장 시 사용)
-   * ⭐️ [신규 추가된 메서드]
+   * 2. 방 정보/유저 목록 요청
    */
   @SubscribeMessage('request_room_info')
   async handleRequestRoomInfo(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { roomId: string },
   ) {
-    this.logger.log(`📥 유저 리스트 요청: ${data.roomId} (by ${client.id})`);
+    this.logger.log(`방 유저 목록 요청: ${data.roomId} (by ${client.id})`);
 
     try {
-      // 최신 유저 리스트 조회
+      // 최신 유저 목록 조회
       const users = await this.roomsService.getUsersInRoom(data.roomId);
 
-      // 요청한 사람에게만(client.emit) 최신 리스트 전송
+      // 요청자에게만 최신 목록 전송
       client.emit('lobby_updated', {
         users: users,
       });
     } catch (error) {
-      this.logger.error(`정보 요청 실패: ${error.message}`);
+      this.logger.error(`방 정보 요청 실패: ${error.message}`);
     }
   }
 
@@ -114,7 +114,7 @@ export class RoomsGateway {
     // Service 호출
     const room = await this.roomsService.updateRoomConfig(client.id, data.config);
 
-    // 변경된 설정 방송
+    // 변경된 설정 브로드캐스트
     this.server.to(room.roomUuid).emit('room_config_updated', { config: room.config });
   }
 
@@ -149,24 +149,23 @@ export class RoomsGateway {
     @MessageBody() data: ChatDto, // DTO 적용
   ) {
     try {
-      // 1. 소켓 ID로 유저 정보 가져오기 (Service 헬퍼 사용)
+      // 1. 소켓 ID로 유저 정보 조회 (Service 통해서 사용)
       const user = await this.roomsService.getUserBySocket(client.id);
 
       // 2. 로그 (선택 사항)
-      // this.logger.log(`💬 [Chat] ${user.nickname}: ${data.message}`);
 
-      // 3. 방 전체에 방송
+      // 3. 방 전체 브로드캐스트
       this.server.to(user.roomUuid).emit('chat_message', {
-        senderId: client.id, // 내 메시지인지 구분용
-        nickname: user.nickname, // 화면 표시용 이름
-        avatarId: user.avatarId, // 프사 표시용
-        team: user.team, // (선택) 팀원끼리 색깔 다르게 표시할 때 유용
-        isHost: user.isHost, // (선택) 방장 표시용
+        senderId: client.id, // 메시지 구분용
+        nickname: user.nickname, // 화면 표시 닉네임
+        avatarId: user.avatarId, // 아바타 표시용
+        team: user.team, // (선택) 팀별 색상 표시 등
+        isHost: user.isHost, // (선택) 방장 표시
         message: data.message,
         timestamp: Date.now(),
       });
     } catch (error) {
-      // 유저를 못 찾거나 에러가 나면 조용히 무시하거나 에러 리턴
+      // 유저를 찾지 못하거나 오류가 나면 에러 반환
       return { status: 'error', message: '메시지 전송 실패' };
     }
   }
@@ -197,7 +196,7 @@ export class RoomsGateway {
       this.server.to(roomUuid).emit('chat_message', {
         nickname: 'SYSTEM',
         message: `${updatedUser.nickname}님이 ${updatedUser.team}팀으로 이동했습니다.`,
-        type: 'system', // 프론트에서 회색으로 표시
+        type: 'system', // 시스템 메시지
       });
 
       return {
@@ -257,18 +256,18 @@ export class RoomsGateway {
   }
 
   /**
-   * ⭐️ [신규] 자동 채우기 요청
-   * - 방장이 누르면 빈 슬롯에 관객을 채워넣음
+   * [옵션] 자동 채우기 요청
+   * - 방장이 빈 팀 슬롯을 관전자에서 채움
    */
   @SubscribeMessage('auto_fill')
   async handleAutoFill(@ConnectedSocket() client: Socket, @MessageBody() data: { roomId: string }) {
-    this.logger.log(`🤖 Auto-fill request by ${client.id}`);
+    this.logger.log(`auto_fill 요청: ${client.id}`);
 
     try {
       // Service 호출
       const { updatedUsers, roomUuid } = await this.roomsService.autoFillSlots(client.id);
 
-      // 변경된 유저 리스트 방송 (화면에 누가 어디로 들어갔는지 보여줌)
+      // 변경된 유저 목록 브로드캐스트
       this.server.to(roomUuid).emit('lobby_updated', {
         users: updatedUsers,
       });
@@ -280,8 +279,8 @@ export class RoomsGateway {
   }
 
   /**
-   * ⭐️ [변경] 게임 시작 요청
-   * - 이제는 "검증"만 하고 바로 시작함 (자동 채우기 로직 빠짐)
+   * 게임 시작 요청
+   * - 서버 검증 후 실제 게임 시작
    */
   @SubscribeMessage('start_game')
   async handleStartGame(
@@ -289,26 +288,42 @@ export class RoomsGateway {
     @MessageBody() data: { roomId: string },
   ) {
     try {
-      // Service에서 조건 검사(풀방+전원레디) 후 시작 처리
+      // Service에서 조건 검증 후 게임 시작 처리
       const { roomUuid } = await this.roomsService.startGame(client.id);
 
-      // 심사위원 선정 (기존 로직 유지)
+      // 심사위원 선정
       const judges = await this.aiJudgeService.selectAndSaveJudges(roomUuid);
 
-      // 게임 시작 방송
+      // 게임 시작 브로드캐스트
       this.server.to(roomUuid).emit('game_started', {
         judges: judges,
       });
 
+      const room = await this.roomsService.getRoomById(roomUuid);
+      const roundMs = room.config.roundTime * 1000;
+      const votingMs = room.config.voteTime * 1000;
+
+      await this.gamesService.startGameFlow(
+        roomUuid,
+        roundMs,
+        votingMs,
+        (phase, durationMs) => {
+          this.emitPhase(roomUuid, phase, durationMs);
+        },
+        async () => {
+          await this.roomsService.updateRoomStatus(roomUuid, 'ENDED');
+        },
+      );
+
       return { status: 'success' };
     } catch (error) {
-      // 조건 불만족 시 에러 메시지 리턴 (프론트에서 alert 띄우기 용)
+      // 조건 미충족 등 에러 메시지 반환
       return { status: 'error', message: error.message };
     }
   }
 
   /**
-   * 6. 🚫 유저 강퇴 (방장만 가능)
+   * 6. 유저 강퇴 (방장만 가능)
    */
   @SubscribeMessage('kick_user')
   async handleKickUser(@ConnectedSocket() client: Socket, @MessageBody() data: KickUserDto) {
@@ -320,7 +335,7 @@ export class RoomsGateway {
         data.public_user_id,
       );
 
-      // 강퇴 이후에도 같은 방의 유저 목록을 최신 상태로 브로드캐스트
+      // 강퇴 이후에도 같은 방의 유저 목록 브로드캐스트
       this.server.to(roomUuid).emit('lobby_updated', {
         users,
       });
@@ -335,5 +350,12 @@ export class RoomsGateway {
       this.logger.error(`kick_user failed: ${error.message}`);
       return { status: 'error', message: error.message };
     }
+  }
+  private emitPhase(roomUuid: string, phase: Phase, durationMs: number) {
+    this.server.to(roomUuid).emit('game_phase_changed', {
+      phase,
+      startAt: Date.now(),
+      durationMs,
+    });
   }
 }
