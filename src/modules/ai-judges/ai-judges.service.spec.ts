@@ -63,6 +63,7 @@ describe('AiJudgeService', () => {
   it('단일 심사위원(judge) 정보로 평가를 수행하고 결과를 반환해야 한다', async () => {
     // [준비 1] 가상의 심사위원 데이터 생성 (JudgeConfig 타입)
     const mockJudge: JudgeConfig = {
+      id: 1,
       name: '테스트 판사',
       persona: '너는 테스트를 위한 가상의 판사야.',
     };

@@ -268,10 +268,14 @@ import { RoomsRepository } from './rooms.repository';
 import { Room } from '../../common/types/room.type';
 import { User, UserRole, UserTeam } from '../../common/types/user.type'; // 🚨 types/user.type.ts가 수정되어 있어야 함
 import { generateUUIDToken, generateRoomId } from '../../common/utils/id.util';
+import { GamesService } from '../games/games.service';
 
 @Injectable()
 export class RoomsService {
-  constructor(private readonly roomsRepository: RoomsRepository) {}
+  constructor(
+    private readonly roomsRepository: RoomsRepository,
+    private readonly gamesService: GamesService,
+  ) {}
 
   async createRoom(dto: CreateRoomDto): Promise<CreateRoomResponseDto> {
     const roomId = generateRoomId();
@@ -743,14 +747,16 @@ export class RoomsService {
     // 팀원 순서대로 ID 추출
     const sortedTeamA = teamAUsers
       .sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0))
-      .map((u) => u.publicUserId);
+      .map((u) => u.publicUserId.toString());
     const sortedTeamB = teamBUsers
       .sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0))
-      .map((u) => u.publicUserId);
+      .map((u) => u.publicUserId.toString());
 
     console.log(`🚀 게임 시작 조건 만족! A: ${sortedTeamA}, B: ${sortedTeamB}`);
 
     // TODO: GameState DB 초기화 로직 (this.gameStateRepository.initGame...)
+    // GameState 초기화 호출
+    await this.gamesService.initGame(roomUuid, sortedTeamA, sortedTeamB);
 
     // 4. 방 상태 변경
     room.status = 'PLAYING';
