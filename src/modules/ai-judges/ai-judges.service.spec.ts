@@ -65,7 +65,6 @@ describe('AiJudgeService', () => {
     const mockJudge: JudgeConfig = {
       name: '테스트 판사',
       persona: '너는 테스트를 위한 가상의 판사야.',
-      imageUrl: 'http://example.com/judge.png',
     };
 
     // [준비 2] 평가받을 문장 데이터 생성 (DTO)
