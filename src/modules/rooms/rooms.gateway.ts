@@ -10,10 +10,10 @@ import { Logger } from '@nestjs/common';
 import { RoomsService } from './rooms.service';
 import { JoinRoomDto } from './dto/join-room.dto';
 import { LeaveTeamDto } from './dto/leave-team.dto';
-import { Room, RoomConfig } from '../../common/types/room.type';
+import { Room, RoomConfig } from './types/room.type';
 import { KickUserDto } from './dto/kick-user.dto';
 import { ChatDto } from './dto/chat.dto';
-import { User } from '../../common/types/user.type';
+import { User } from '../users/types/user.type';
 import { AiJudgeService } from '../ai-judges/ai-judges.service';
 
 @WebSocketGateway({

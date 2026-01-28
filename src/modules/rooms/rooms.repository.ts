@@ -2,8 +2,8 @@ import { Inject, Injectable, NotFoundException, BadRequestException } from '@nes
 import Redis from 'ioredis';
 
 import { redisKeys } from '../../common/constants/redis.keys';
-import { Room } from '../../common/types/room.type';
-import { User } from '../../common/types/user.type';
+import { Room } from './types/room.type';
+import { User } from '../users/types/user.type';
 
 @Injectable()
 export class RoomsRepository {

@@ -1,7 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { RoomsService } from './rooms.service';
-import { User } from '../../common/types/user.type';
-import { Room } from '../../common/types/room.type';
+import { User } from '../users/types/user.type';
+import { Room } from './types/room.type';
 import * as idUtil from '../../common/utils/id.util';
 
 describe('RoomsService.joinTeam', () => {

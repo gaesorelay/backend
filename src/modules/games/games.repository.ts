@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import Redis from 'ioredis';
-import { GameState } from '../../common/types/game-state.type';
+import { GameState } from './types/game-state.type';
 import { redisKeys } from '../../common/constants/redis.keys'; // import 확인
 
 @Injectable()

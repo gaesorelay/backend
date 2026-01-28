@@ -265,8 +265,8 @@ import { Injectable, Inject, NotFoundException, BadRequestException } from '@nes
 import { CreateRoomDto } from './dto/create-room.dto';
 import { CreateRoomResponseDto } from './dto/create-room.response.dto';
 import { RoomsRepository } from './rooms.repository';
-import { Room } from '../../common/types/room.type';
-import { User, UserRole, UserTeam } from '../../common/types/user.type'; // 🚨 types/user.type.ts가 수정되어 있어야 함
+import { Room } from './types/room.type';
+import { User, UserRole, UserTeam } from '../users/types/user.type'; // 🚨 types/user.type.ts가 수정되어 있어야 함
 import { generateUUIDToken, generateRoomId } from '../../common/utils/id.util';
 import { GamesService } from '../games/games.service';
 
