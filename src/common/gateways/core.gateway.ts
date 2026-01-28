@@ -11,7 +11,7 @@ import { RoomsService } from '../../modules/rooms/rooms.service';
 @WebSocketGateway({
   namespace: 'game',
   cors: {
-    origin: '*',
+    origin: true, //['http://localhost:5173'], 실제 배포 시에는 프론트엔드 도메인으로 제한해야 함
     credentials: true,
   },
 })

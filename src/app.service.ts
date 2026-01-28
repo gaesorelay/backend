@@ -18,8 +18,14 @@ export class AppService {
     // Redis에 Hash 형태로 방 정보 저장 (HSET)
     await this.redis.hset(roomKey, {
       owner_user_token: 'user-token-abc',
-      status: 'LOBBY',
-      config: JSON.stringify({ maxUser: 8, round: 3 }),
+      status: 'WAITING',
+      config: JSON.stringify({
+        maxPlayers: 8,
+        storytellerCount: 4,
+        rounds: 3,
+        roundTime: 60,
+        voteTime: 30,
+      }),
       created_at: new Date().toISOString(),
     });
 

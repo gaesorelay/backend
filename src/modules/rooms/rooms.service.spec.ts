@@ -37,8 +37,10 @@ describe('RoomsService.joinTeam', () => {
       currentSocketId: 'socket1',
       roomUuid,
       nickname: 'host',
-      role: 'HOST',
-      team: 'NONE',
+      role: 'PLAYER',
+      isHost: true,
+      team: 'A',
+      slotIndex: 0,
       avatarId: 1,
       isReady: false,
     };
@@ -49,7 +51,9 @@ describe('RoomsService.joinTeam', () => {
       roomUuid,
       nickname: 'user',
       role: 'PLAYER',
-      team: 'NONE',
+      isHost: false,
+      team: null,
+      slotIndex: null,
       avatarId: 2,
       isReady: false,
     };
@@ -71,13 +75,13 @@ describe('RoomsService.joinTeam', () => {
     expect(roomsRepository.saveUser).toHaveBeenCalledTimes(1);
     expect(roomsRepository.saveUser.mock.calls[0][0]).toMatchObject({
       publicUserId: 2,
-      team: 'TEAM_A',
+      team: 'A',
       role: 'PLAYER',
       slotIndex: 1,
     });
     expect(result.roomUuid).toBe(roomUuid);
     expect(result.updatedUser.publicUserId).toBe(2);
-    expect(result.updatedUser.team).toBe('TEAM_A');
+    expect(result.updatedUser.team).toBe('A');
   });
 
   // 일반 유저가 다른 유저를 배정하려고 하면 거부
@@ -90,7 +94,9 @@ describe('RoomsService.joinTeam', () => {
       roomUuid,
       nickname: 'user1',
       role: 'PLAYER',
-      team: 'NONE',
+      isHost: false,
+      team: null,
+      slotIndex: null,
       avatarId: 1,
       isReady: false,
     };
@@ -101,7 +107,9 @@ describe('RoomsService.joinTeam', () => {
       roomUuid,
       nickname: 'user2',
       role: 'PLAYER',
-      team: 'NONE',
+      isHost: false,
+      team: null,
+      slotIndex: null,
       avatarId: 2,
       isReady: false,
     };
@@ -129,7 +137,9 @@ describe('RoomsService.joinTeam', () => {
       roomUuid,
       nickname: 'user1',
       role: 'PLAYER',
-      team: 'NONE',
+      isHost: false,
+      team: null,
+      slotIndex: null,
       avatarId: 1,
       isReady: false,
     };
@@ -145,7 +155,7 @@ describe('RoomsService.joinTeam', () => {
 
     expect(roomsRepository.saveUser).toHaveBeenCalledTimes(1);
     expect(result.updatedUser.publicUserId).toBe(2);
-    expect(result.updatedUser.team).toBe('TEAM_B');
+    expect(result.updatedUser.team).toBe('B');
   });
 
   // 팀 값이 잘못된 경우 예외 발생
@@ -157,8 +167,10 @@ describe('RoomsService.joinTeam', () => {
       currentSocketId: 'socket1',
       roomUuid,
       nickname: 'host',
-      role: 'HOST',
-      team: 'NONE',
+      role: 'PLAYER',
+      isHost: true,
+      team: 'A',
+      slotIndex: 0,
       avatarId: 1,
       isReady: false,
     };
@@ -202,8 +214,14 @@ describe('RoomsService.joinRoom', () => {
     roomUuid,
     ownerUserToken: 'owner-token',
     title: 'room',
-    status: 'LOBBY',
-    config: { roundCount: 1, roundTimeSeconds: 60, votingTimeSeconds: 60, teamSize: 2 },
+    status: 'WAITING',
+    config: {
+      maxPlayers: 4,
+      storytellerCount: 2,
+      rounds: 1,
+      roundTime: 60,
+      voteTime: 60,
+    },
     createdAt: 0,
   };
 
@@ -240,7 +258,9 @@ describe('RoomsService.joinRoom', () => {
       roomUuid,
       nickname: 'user',
       role: 'PLAYER',
-      team: 'NONE',
+      isHost: false,
+      team: null,
+      slotIndex: null,
       avatarId: 1,
       isReady: false,
     };
@@ -283,7 +303,7 @@ describe('RoomsService.joinRoom', () => {
   it('throws when room is full', async () => {
     // 방은 존재하지만 인원이 최대치
     roomsRepository.findById.mockResolvedValue(room);
-    roomsRepository.getUserCount.mockResolvedValue(4); // teamSize 2 -> max 4
+    roomsRepository.getUserCount.mockResolvedValue(4); // maxPlayers 4
 
     // 정원 초과 시 BadRequestException
     await expect(service.joinRoom(roomUuid, 'user', 'socket1', 1)).rejects.toBeInstanceOf(
@@ -301,8 +321,11 @@ describe('RoomsService.joinRoom', () => {
     // 첫 유저 입장
     const result = await service.joinRoom(roomUuid, 'host', 'socket1', 1);
 
-    // HOST 배정 및 ownerToken 사용 검증
-    expect(result.role).toBe('HOST');
+    // ??? ??? ? ownerToken ?? ??
+    expect(result.role).toBe('PLAYER');
+    expect(result.isHost).toBe(true);
+    expect(result.team).toBe('A');
+    expect(result.slotIndex).toBe(0);
     expect(result.userToken).toBe('owner-token');
     expect(result.publicUserId).toBe(7);
     expect(roomsRepository.saveUser).toHaveBeenCalledTimes(1);
@@ -310,7 +333,7 @@ describe('RoomsService.joinRoom', () => {
   });
 
   // 일반 입장은 PLAYER로 배정되고 새 토큰 발급
-  it('creates player when not first user', async () => {
+  it('creates audience when not first user', async () => {
     // 두 번째 이후 입장 시나리오
     roomsRepository.findById.mockResolvedValue(room);
     roomsRepository.getUserCount.mockResolvedValue(1);
@@ -320,7 +343,10 @@ describe('RoomsService.joinRoom', () => {
     const result = await service.joinRoom(roomUuid, 'user', 'socket1', 1);
 
     // PLAYER 배정 및 신규 토큰 발급 확인
-    expect(result.role).toBe('PLAYER');
+    expect(result.role).toBe('AUDIENCE');
+    expect(result.isHost).toBe(false);
+    expect(result.team).toBeNull();
+    expect(result.slotIndex).toBeNull();
     expect(result.userToken).toBe('new-token');
     expect(result.publicUserId).toBe(8);
     expect(roomsRepository.saveUser).toHaveBeenCalledTimes(1);
@@ -359,7 +385,9 @@ describe('RoomsService.setUserReady', () => {
       roomUuid,
       nickname: 'user',
       role: 'PLAYER',
-      team: 'NONE',
+      isHost: false,
+      team: null,
+      slotIndex: null,
       avatarId: 1,
       isReady: false,
     };

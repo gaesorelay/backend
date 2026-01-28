@@ -8,12 +8,13 @@ import {
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
 import { RoomsService } from './rooms.service';
+import { JoinRoomDto } from './dto/join-room.dto';
 import { User } from '../../common/types/user.type';
 
 @WebSocketGateway({
   namespace: 'game',
   cors: {
-    origin: '*',
+    origin: true, //['http://localhost:5173'], 실제 배포 시에는 프론트엔드 도메인으로 제한해야 함
     credentials: true,
   },
 })
@@ -23,11 +24,14 @@ export class RoomsGateway {
 
   constructor(private readonly roomsService: RoomsService) {}
 
+  /**
+   * 1. 방 입장 (Setup -> GameRoom 진입 시)
+   */
   @SubscribeMessage('join_room')
   async handleJoinRoom(
     @ConnectedSocket() client: Socket,
     @MessageBody()
-    data: { roomId: string; nickname: string; avatarId: number; userToken?: string },
+    data: JoinRoomDto,
   ) {
     this.logger.log(`🔍 join_room 요청: 방=${data.roomId}, 닉네임=${data.nickname}`);
 
@@ -40,22 +44,51 @@ export class RoomsGateway {
         data.userToken,
       );
 
+      // 소켓을 해당 방 채널에 조인
       client.join(data.roomId);
-      this.logger.log(
-        `join_room token: ${user.userToken} (room: ${data.roomId}, nickname: ${user.nickname})`,
-      );
-      this.logger.log(`✅ 소켓 룸 입장 완료: ${client.id} -> ${data.roomId}`);
 
-      client.to(data.roomId).emit('user_joined', {
-        nickname: user.nickname,
-        role: user.role,
-        avatarId: user.avatarId,
+      this.logger.log(
+        `✅ 입장 성공: ${user.nickname} (Token: ${user.userToken}, Socket: ${client.id})`,
+      );
+
+      // ⭐️ [변경] 단순히 "누가 왔다"가 아니라, "최신 유저 리스트"를 방 전체에 뿌립니다.
+      // 이를 위해선 Service에 getUsersInRoom 함수가 있어야 합니다.
+      const users = await this.roomsService.getUsersInRoom(data.roomId);
+      
+      this.server.to(data.roomId).emit('lobby_updated', {
+        users: users,
+        // 필요하다면 여기에 roomConfig 같은 방 정보도 같이 보낼 수 있음
       });
 
+      // 요청자에게는 내 정보를 리턴 (콜백용)
       return { status: 'success', data: user };
     } catch (error) {
       this.logger.error(`❌ 입장 실패: ${error.message}`);
       return { status: 'error', message: error.message };
+    }
+  }
+
+  /**
+   * 2. 방 정보/유저리스트 요청 (새로고침, 게스트 입장 시 사용)
+   * ⭐️ [신규 추가된 메서드]
+   */
+  @SubscribeMessage('request_room_info')
+  async handleRequestRoomInfo(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { roomId: string }
+  ) {
+    this.logger.log(`📥 유저 리스트 요청: ${data.roomId} (by ${client.id})`);
+    
+    try {
+      // 최신 유저 리스트 조회
+      const users = await this.roomsService.getUsersInRoom(data.roomId);
+      
+      // 요청한 사람에게만(client.emit) 최신 리스트 전송
+      client.emit('lobby_updated', {
+        users: users,
+      });
+    } catch (error) {
+      this.logger.error(`정보 요청 실패: ${error.message}`);
     }
   }
 
