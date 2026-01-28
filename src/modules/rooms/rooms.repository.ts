@@ -121,8 +121,26 @@ export class RoomsRepository {
     // 두 키를 동시에 삭제
     await this.client.del(userKey, socketKey);
   }
+  /**
+   * 강퇴 등으로 유저를 제거할 때 사용하는 유저 삭제 로직
+   * - socketId가 있을 때만 소켓 매핑까지 함께 삭제
+   */
+  async deleteUserByToken(
+    roomUuid: string,
+    userToken: string,
+    socketId?: string | null,
+  ): Promise<void> {
+    const userKey = redisKeys.roomUser(roomUuid, userToken);
+    if (socketId) {
+      const socketKey = redisKeys.socketMap(socketId);
+      await this.client.del(userKey, socketKey);
+      return;
+    }
 
-  // 👇 [추가] 특정 유저 데이터에 만료 시간(TTL) 설정
+    await this.client.del(userKey);
+  }
+
+  // [추가] 특정 유저 데이터에 TTL 설정
   async setUserTTL(roomUuid: string, userToken: string, ttlSeconds: number): Promise<void> {
     const key = redisKeys.roomUser(roomUuid, userToken);
     // 'EXPIRE' 명령어: 해당 키를 ttlSeconds 초 뒤에 삭제함

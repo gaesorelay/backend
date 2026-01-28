@@ -11,6 +11,7 @@ import { RoomsService } from './rooms.service';
 import { JoinRoomDto } from './dto/join-room.dto';
 import { LeaveTeamDto } from './dto/leave-team.dto';
 import { Room, RoomConfig } from '../../common/types/room.type';
+import { KickUserDto } from './dto/kick-user.dto';
 import { User } from '../../common/types/user.type';
 import { AiJudgeService } from '../ai-judges/ai-judges.service';
 
@@ -261,6 +262,36 @@ export class RoomsGateway {
       return { status: 'success' };
     } catch (error) {
       // 조건 불만족 시 에러 메시지 리턴 (프론트에서 alert 띄우기 용)
+      return { status: 'error', message: error.message };
+    }
+  }
+
+  /**
+   * 6. 🚫 유저 강퇴 (방장만 가능)
+   */
+  @SubscribeMessage('kick_user')
+  async handleKickUser(@ConnectedSocket() client: Socket, @MessageBody() data: KickUserDto) {
+    this.logger.log(`kick_user request: socket ${client.id}, target ${data.public_user_id}`);
+
+    try {
+      const { kickedPublicUserId, users, roomUuid } = await this.roomsService.kickUser(
+        client.id,
+        data.public_user_id,
+      );
+
+      // 강퇴 이후에도 같은 방의 유저 목록을 최신 상태로 브로드캐스트
+      this.server.to(roomUuid).emit('lobby_updated', {
+        users,
+      });
+
+      return {
+        status: 'success',
+        data: {
+          kickedPublicUserId,
+        },
+      };
+    } catch (error) {
+      this.logger.error(`kick_user failed: ${error.message}`);
       return { status: 'error', message: error.message };
     }
   }

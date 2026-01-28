@@ -610,3 +610,150 @@ describe('RoomsService.setUserReady', () => {
     await expect(service.setUserReady('socket1', true)).rejects.toBeInstanceOf(NotFoundException);
   });
 });
+
+describe('RoomsService.kickUser', () => {
+  let service: RoomsService;
+  let roomsRepository: {
+    getMappingBySocketId: jest.Mock;
+    findUserByToken: jest.Mock;
+    findAllUsersInRoom: jest.Mock;
+    deleteUserByToken: jest.Mock;
+  };
+
+  const roomUuid = 'ROOM123';
+
+  beforeEach(() => {
+    roomsRepository = {
+      getMappingBySocketId: jest.fn(),
+      findUserByToken: jest.fn(),
+      findAllUsersInRoom: jest.fn(),
+      deleteUserByToken: jest.fn(),
+    };
+    service = new RoomsService(roomsRepository as unknown as any);
+  });
+
+  it('kicks target user when requester is host', async () => {
+    const requester: User = {
+      userToken: 'token-host',
+      publicUserId: 1,
+      currentSocketId: 'socket1',
+      roomUuid,
+      nickname: 'host',
+      role: 'PLAYER',
+      isHost: true,
+      team: 'A',
+      slotIndex: 0,
+      avatarId: 1,
+      isReady: false,
+    };
+    const target: User = {
+      userToken: 'token-user',
+      publicUserId: 2,
+      currentSocketId: 'socket2',
+      roomUuid,
+      nickname: 'user',
+      role: 'PLAYER',
+      isHost: false,
+      team: null,
+      slotIndex: null,
+      avatarId: 2,
+      isReady: false,
+    };
+
+    roomsRepository.getMappingBySocketId.mockResolvedValue({
+      roomUuid,
+      userToken: requester.userToken,
+    });
+    roomsRepository.findUserByToken.mockResolvedValue(requester);
+    roomsRepository.findAllUsersInRoom.mockResolvedValue([requester, target]);
+
+    const result = await service.kickUser('socket1', 2);
+
+    expect(roomsRepository.deleteUserByToken).toHaveBeenCalledTimes(1);
+    expect(roomsRepository.deleteUserByToken).toHaveBeenCalledWith(
+      roomUuid,
+      target.userToken,
+      target.currentSocketId,
+    );
+    expect(result.kickedPublicUserId).toBe(2);
+    expect(result.users).toHaveLength(1);
+    expect(result.users[0].publicUserId).toBe(1);
+    expect(result.roomUuid).toBe(roomUuid);
+  });
+
+  it('rejects when requester is not host', async () => {
+    const requester: User = {
+      userToken: 'token-user1',
+      publicUserId: 1,
+      currentSocketId: 'socket1',
+      roomUuid,
+      nickname: 'user1',
+      role: 'PLAYER',
+      isHost: false,
+      team: null,
+      slotIndex: null,
+      avatarId: 1,
+      isReady: false,
+    };
+    const target: User = {
+      userToken: 'token-user2',
+      publicUserId: 2,
+      currentSocketId: 'socket2',
+      roomUuid,
+      nickname: 'user2',
+      role: 'PLAYER',
+      isHost: false,
+      team: null,
+      slotIndex: null,
+      avatarId: 2,
+      isReady: false,
+    };
+
+    roomsRepository.getMappingBySocketId.mockResolvedValue({
+      roomUuid,
+      userToken: requester.userToken,
+    });
+    roomsRepository.findUserByToken.mockResolvedValue(requester);
+    roomsRepository.findAllUsersInRoom.mockResolvedValue([requester, target]);
+
+    await expect(service.kickUser('socket1', 2)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('throws when mapping is missing', async () => {
+    roomsRepository.getMappingBySocketId.mockResolvedValue(null);
+
+    await expect(service.kickUser('socket1', 2)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('throws when requester is missing', async () => {
+    roomsRepository.getMappingBySocketId.mockResolvedValue({ roomUuid, userToken: 'token-user' });
+    roomsRepository.findUserByToken.mockResolvedValue(null);
+
+    await expect(service.kickUser('socket1', 2)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('throws when target user is missing', async () => {
+    const requester: User = {
+      userToken: 'token-host',
+      publicUserId: 1,
+      currentSocketId: 'socket1',
+      roomUuid,
+      nickname: 'host',
+      role: 'PLAYER',
+      isHost: true,
+      team: 'A',
+      slotIndex: 0,
+      avatarId: 1,
+      isReady: false,
+    };
+
+    roomsRepository.getMappingBySocketId.mockResolvedValue({
+      roomUuid,
+      userToken: requester.userToken,
+    });
+    roomsRepository.findUserByToken.mockResolvedValue(requester);
+    roomsRepository.findAllUsersInRoom.mockResolvedValue([requester]);
+
+    await expect(service.kickUser('socket1', 2)).rejects.toBeInstanceOf(NotFoundException);
+  });
+});

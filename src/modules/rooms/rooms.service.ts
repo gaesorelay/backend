@@ -539,6 +539,52 @@ export class RoomsService {
     return { updatedUser, users: updatedUsers, roomUuid: mapping.roomUuid };
   }
 
+  /**
+   * 🚫 유저 강퇴 로직
+   * - 방장만 가능 (isHost 체크)
+   * - 대상 유저의 Redis 데이터와 소켓 매핑을 함께 제거
+   */
+  async kickUser(
+    socketId: string,
+    targetPublicUserId: number,
+  ): Promise<{ kickedPublicUserId: number; users: User[]; roomUuid: string }> {
+    // 1) 요청자(방장) 식별
+    const mapping = await this.roomsRepository.getMappingBySocketId(socketId);
+    if (!mapping) throw new NotFoundException('User not found.');
+
+    const requester = await this.roomsRepository.findUserByToken(
+      mapping.roomUuid,
+      mapping.userToken,
+    );
+    if (!requester) throw new NotFoundException('User not found.');
+
+    // 2) 권한 체크: 방장만 강퇴 가능
+    if (!requester.isHost) {
+      throw new BadRequestException('Only host can kick users.');
+    }
+
+    // 3) 대상 유저 조회
+    const users = await this.roomsRepository.findAllUsersInRoom(mapping.roomUuid);
+    const target = users.find((user) => user.publicUserId === targetPublicUserId);
+    if (!target) throw new NotFoundException('Target user not found.');
+
+    // 4) 대상 유저 데이터/소켓 매핑 삭제
+    await this.roomsRepository.deleteUserByToken(
+      mapping.roomUuid,
+      target.userToken,
+      target.currentSocketId,
+    );
+
+    // 5) 최신 유저 목록 반환 (강퇴된 유저 제외)
+    const updatedUsers = users.filter((user) => user.publicUserId !== targetPublicUserId);
+
+    return {
+      kickedPublicUserId: targetPublicUserId,
+      users: updatedUsers,
+      roomUuid: mapping.roomUuid,
+    };
+  }
+
   async leaveRoom(socketId: string): Promise<{ roomUuid: string; nickname: string } | null> {
     const mapping = await this.roomsRepository.getMappingBySocketId(socketId);
     if (!mapping) return null;
