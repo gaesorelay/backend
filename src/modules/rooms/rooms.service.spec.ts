@@ -536,9 +536,7 @@ describe('RoomsService.leaveTeam', () => {
     // 1) 소켓 매핑 없음
     roomsRepository.getMappingBySocketId.mockResolvedValue(null);
 
-    await expect(service.leaveTeam('socket1', 1, 0, 'A')).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(service.leaveTeam('socket1', 1, 0, 'A')).rejects.toBeInstanceOf(NotFoundException);
   });
 });
 

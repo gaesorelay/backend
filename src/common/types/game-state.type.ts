@@ -3,8 +3,8 @@ export interface GameState {
   currentRound: number;
   teamAOrder: string[];
   teamBOrder: string[];
-  teamAImages: string[]; //이미지는 url로 저장
-  teamBImages: string[]; //이미지는 url로 저장
+  imageIDs: number[];
+  aiJudgeIDs: number[];
   teamAStory: string[];
   teamBStory: string[];
   turnEndAt: number;
