@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <title>채팅 테스트</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+      .container {
+        display: flex;
+        gap: 20px;
+      }
+      .box {
+        border: 1px solid #ccc;
+        padding: 20px;
+        width: 45%;
+      }
+      #logs,
+      #logs2 {
+        height: 300px;
+        overflow-y: scroll;
+        background: #f9f9f9;
+        border: 1px solid #eee;
+        margin-bottom: 10px;
+      }
+      .my-msg {
+        color: blue;
+        text-align: right;
+      }
+      .other-msg {
+        color: green;
+        text-align: left;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>🕵️‍♂️ 대기실 채팅 테스트</h2>
+    <p>먼저 REST API로 방을 만들고 <b>Room UUID</b>를 아래에 입력하세요.</p>
+
+    <label
+      >Room UUID: <input type="text" id="roomIdInput" placeholder="uuid-..." style="width: 300px"
+    /></label>
+    <button onclick="startTest()">테스트 시작 (2명 접속)</button>
+
+    <hr />
+
+    <div class="container" id="gameArea" style="display: none">
+      <div class="box">
+        <h3>유저 A (방장)</h3>
+        <div id="logs"></div>
+        <input type="text" id="msgA" placeholder="메시지 입력" />
+        <button onclick="sendChatA()">전송</button>
+      </div>
+
+      <div class="box">
+        <h3>유저 B (게스트)</h3>
+        <div id="logs2"></div>
+        <input type="text" id="msgB" placeholder="메시지 입력" />
+        <button onclick="sendChatB()">전송</button>
+      </div>
+    </div>
+
+    <script>
+      let socketA, socketB;
+      const roomIdInput = document.getElementById('roomIdInput');
+
+      function startTest() {
+        const roomId = roomIdInput.value;
+        if (!roomId) return alert('방 ID를 입력하세요!');
+
+        document.getElementById('gameArea').style.display = 'flex';
+
+        // --- 유저 A 접속 (방장 가정) ---
+        socketA = io('http://localhost:8000/game'); // 포트번호 확인
+
+        socketA.on('connect', () => {
+          log('logs', '🔵 A 연결됨');
+          // 입장 요청
+          socketA.emit('join_room', {
+            roomId: roomId,
+            nickname: '철수(방장)',
+            avatarId: 1,
+            // userToken이 있으면 넣어야 방장 유지됨
+          });
+        });
+
+        socketA.on('chat_message', (data) => {
+          const type = data.senderId === socketA.id ? 'my-msg' : 'other-msg';
+          log('logs', `<div class="${type}">[${data.nickname}] ${data.message}</div>`);
+        });
+
+        // --- 유저 B 접속 (게스트) ---
+        socketB = io('http://localhost:8000/game');
+
+        socketB.on('connect', () => {
+          log('logs2', '🟢 B 연결됨');
+          // 입장 요청
+          socketB.emit('join_room', {
+            roomId: roomId,
+            nickname: '영희(게스트)',
+            avatarId: 2,
+          });
+        });
+
+        socketB.on('chat_message', (data) => {
+          const type = data.senderId === socketB.id ? 'my-msg' : 'other-msg';
+          log('logs2', `<div class="${type}">[${data.nickname}] ${data.message}</div>`);
+        });
+      }
+
+      function sendChatA() {
+        const input = document.getElementById('msgA');
+        socketA.emit('send_chat', { message: input.value });
+        input.value = '';
+      }
+
+      function sendChatB() {
+        const input = document.getElementById('msgB');
+        socketB.emit('send_chat', { message: input.value });
+        input.value = '';
+      }
+
+      function log(divId, html) {
+        const div = document.getElementById(divId);
+        div.innerHTML += html;
+        div.scrollTop = div.scrollHeight;
+      }
+    </script>
+  </body>
+</html>

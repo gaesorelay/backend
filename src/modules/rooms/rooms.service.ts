@@ -768,8 +768,18 @@ export class RoomsService {
     return array;
   }
 
-  // ... (기존 selectAndSaveJudges 호출을 위한 래퍼 메서드가 필요하다면 추가)
-  // async selectAndSaveJudges(roomUuid: string) {
-  //   return this.aiJudgeService.selectAndSaveJudges(roomUuid);
-  // }
+  /**
+   * 🔍 소켓 ID로 유저 정보 찾기 (Gateway에서 사용)
+   */
+  async getUserBySocket(socketId: string): Promise<User> {
+    // 1. 매핑 정보 조회
+    const mapping = await this.roomsRepository.getMappingBySocketId(socketId);
+    if (!mapping) throw new NotFoundException('Socket mapping not found');
+
+    // 2. 유저 상세 정보 조회
+    const user = await this.roomsRepository.findUserByToken(mapping.roomUuid, mapping.userToken);
+    if (!user) throw new NotFoundException('User not found');
+
+    return user;
+  }
 }

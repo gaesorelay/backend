@@ -12,6 +12,7 @@ import { JoinRoomDto } from './dto/join-room.dto';
 import { LeaveTeamDto } from './dto/leave-team.dto';
 import { Room, RoomConfig } from '../../common/types/room.type';
 import { KickUserDto } from './dto/kick-user.dto';
+import { ChatDto } from './dto/chat.dto';
 import { User } from '../../common/types/user.type';
 import { AiJudgeService } from '../ai-judges/ai-judges.service';
 
@@ -65,6 +66,12 @@ export class RoomsGateway {
       this.server.to(data.roomId).emit('lobby_updated', {
         users: users,
         // 필요하다면 여기에 roomConfig 같은 방 정보도 같이 보낼 수 있음
+      });
+
+      this.server.to(data.roomId).emit('chat_message', {
+        nickname: 'SYSTEM',
+        message: `${user.nickname}님이 입장했습니다.`,
+        type: 'system', // 프론트에서 회색으로 표시
       });
 
       // 요청자에게는 내 정보를 리턴 (콜백용)
@@ -136,6 +143,34 @@ export class RoomsGateway {
     }
   }
 
+  @SubscribeMessage('send_chat')
+  async handleChat(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: ChatDto, // DTO 적용
+  ) {
+    try {
+      // 1. 소켓 ID로 유저 정보 가져오기 (Service 헬퍼 사용)
+      const user = await this.roomsService.getUserBySocket(client.id);
+
+      // 2. 로그 (선택 사항)
+      // this.logger.log(`💬 [Chat] ${user.nickname}: ${data.message}`);
+
+      // 3. 방 전체에 방송
+      this.server.to(user.roomUuid).emit('chat_message', {
+        senderId: client.id, // 내 메시지인지 구분용
+        nickname: user.nickname, // 화면 표시용 이름
+        avatarId: user.avatarId, // 프사 표시용
+        team: user.team, // (선택) 팀원끼리 색깔 다르게 표시할 때 유용
+        isHost: user.isHost, // (선택) 방장 표시용
+        message: data.message,
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      // 유저를 못 찾거나 에러가 나면 조용히 무시하거나 에러 리턴
+      return { status: 'error', message: '메시지 전송 실패' };
+    }
+  }
+
   @SubscribeMessage('join_team')
   async handleJoinTeam(
     @ConnectedSocket() client: Socket,
@@ -157,6 +192,12 @@ export class RoomsGateway {
       this.server.to(roomUuid).emit('lobby_updated', {
         users,
         updatedUser,
+      });
+
+      this.server.to(roomUuid).emit('chat_message', {
+        nickname: 'SYSTEM',
+        message: `${updatedUser.nickname}님이 ${updatedUser.team}팀으로 이동했습니다.`,
+        type: 'system', // 프론트에서 회색으로 표시
       });
 
       return {
