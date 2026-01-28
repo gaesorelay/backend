@@ -572,4 +572,158 @@ export class RoomsService {
 
     console.log(`⏳ 유저 연결 끊김 (재접속 대기 ${RECONNECT_WINDOW}초): ${userToken}`);
   }
+
+  /**
+   * 🤖 [신규] 빈 슬롯 자동 채우기
+   */
+  async autoFillSlots(socketId: string) {
+    // 1. 권한 확인
+    const mapping = await this.roomsRepository.getMappingBySocketId(socketId);
+    if (!mapping) throw new NotFoundException();
+
+    const requester = await this.roomsRepository.findUserByToken(
+      mapping.roomUuid,
+      mapping.userToken,
+    );
+    if (!requester.isHost) throw new BadRequestException('방장만 자동 채우기를 할 수 있습니다.');
+
+    const roomUuid = mapping.roomUuid;
+    const room = await this.roomsRepository.findById(roomUuid);
+    const users = await this.roomsRepository.findAllUsersInRoom(roomUuid);
+
+    // 2. 빈 슬롯 파악
+    const TEAM_SIZE = room.config.storytellerCount || 4; // 기본값 4
+    const emptySlotsA: number[] = [];
+    const emptySlotsB: number[] = [];
+
+    for (let i = 0; i < TEAM_SIZE; i++) {
+      if (!users.some((u) => u.team === 'A' && u.slotIndex === i)) emptySlotsA.push(i);
+      if (!users.some((u) => u.team === 'B' && u.slotIndex === i)) emptySlotsB.push(i);
+    }
+
+    const totalNeeded = emptySlotsA.length + emptySlotsB.length;
+    if (totalNeeded === 0) {
+      throw new BadRequestException('빈 슬롯이 없습니다.');
+    }
+
+    // 3. 관객(AUDIENCE) 리스트 확보 및 셔플
+    const audience = users.filter((u) => u.role === 'AUDIENCE');
+
+    // (선택사항) 관객이 부족하면 에러? 아니면 있는 만큼만? -> 보통은 부족하면 에러 띄우는 게 낫습니다.
+    if (audience.length < totalNeeded) {
+      throw new BadRequestException(
+        `관객이 부족합니다. (필요: ${totalNeeded}, 현재 관객: ${audience.length})`,
+      );
+    }
+
+    const shuffledAudience = this.shuffleArray([...audience]);
+    const updatedUsersList: User[] = []; // 업데이트된 유저들 저장용
+
+    // 4. 슬롯 채우기 (DB 업데이트)
+    // Team A
+    for (const slot of emptySlotsA) {
+      const targetUser = shuffledAudience.pop();
+      if (targetUser) {
+        targetUser.role = 'PLAYER';
+        targetUser.team = 'A';
+        targetUser.slotIndex = slot;
+        targetUser.isReady = false; // 강제로 들어갔으니 준비 해제
+        await this.roomsRepository.saveUser(targetUser);
+        updatedUsersList.push(targetUser);
+      }
+    }
+    // Team B
+    for (const slot of emptySlotsB) {
+      const targetUser = shuffledAudience.pop();
+      if (targetUser) {
+        targetUser.role = 'PLAYER';
+        targetUser.team = 'B';
+        targetUser.slotIndex = slot;
+        targetUser.isReady = false;
+        await this.roomsRepository.saveUser(targetUser);
+        updatedUsersList.push(targetUser);
+      }
+    }
+
+    // 5. 전체 유저 리스트 다시 조회 (방송용)
+    const allUsers = await this.roomsRepository.findAllUsersInRoom(roomUuid);
+
+    return { updatedUsers: allUsers, roomUuid };
+  }
+
+  /**
+   * 🚀 [변경] 게임 시작 (엄격한 검증)
+   * - 슬롯이 꽉 찼는지 확인
+   * - 모든 플레이어가 Ready 상태인지 확인
+   */
+  async startGame(socketId: string) {
+    const mapping = await this.roomsRepository.getMappingBySocketId(socketId);
+    if (!mapping) throw new NotFoundException();
+
+    const requester = await this.roomsRepository.findUserByToken(
+      mapping.roomUuid,
+      mapping.userToken,
+    );
+    if (!requester.isHost) throw new BadRequestException('방장만 시작할 수 있습니다.');
+
+    const roomUuid = mapping.roomUuid;
+    const room = await this.roomsRepository.findById(roomUuid);
+    const users = await this.roomsRepository.findAllUsersInRoom(roomUuid);
+    const TEAM_SIZE = room.config.storytellerCount || 4;
+
+    // 1. 슬롯 검증 (풀방 체크)
+    const teamAUsers = users.filter((u) => u.team === 'A');
+    const teamBUsers = users.filter((u) => u.team === 'B');
+
+    if (teamAUsers.length !== TEAM_SIZE || teamBUsers.length !== TEAM_SIZE) {
+      throw new BadRequestException(
+        `모든 팀 슬롯이 채워져야 시작할 수 있습니다. (설정: ${TEAM_SIZE}인)`,
+      );
+    }
+
+    // 2. 레디 검증 (전원 레디 체크)
+    // 플레이어(팀이 있는 사람)만 체크합니다. 방장은 제외할지 포함할지 결정해야 함.
+    // 보통 방장은 시작 버튼 누르는 사람이니 Ready가 true여야 하거나, 체크에서 제외합니다.
+    // 여기서는 "방장 포함 모든 플레이어 Ready"로 구현합니다.
+    const notReadyPlayers = users.filter((u) => u.role === 'PLAYER' && !u.isReady);
+
+    if (notReadyPlayers.length > 0) {
+      // 누구누구 안 했는지 알려주면 좋음
+      const names = notReadyPlayers.map((u) => u.nickname).join(', ');
+      throw new BadRequestException(`준비하지 않은 유저가 있습니다: ${names}`);
+    }
+
+    // 3. 게임 상태 초기화 및 DB 저장
+    // 팀원 순서대로 ID 추출
+    const sortedTeamA = teamAUsers
+      .sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0))
+      .map((u) => u.publicUserId);
+    const sortedTeamB = teamBUsers
+      .sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0))
+      .map((u) => u.publicUserId);
+
+    console.log(`🚀 게임 시작 조건 만족! A: ${sortedTeamA}, B: ${sortedTeamB}`);
+
+    // TODO: GameState DB 초기화 로직 (this.gameStateRepository.initGame...)
+
+    // 4. 방 상태 변경
+    room.status = 'PLAYING';
+    await this.roomsRepository.save(room);
+
+    return { roomUuid };
+  }
+
+  // 배열 섞기 유틸
+  private shuffleArray(array: any[]) {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+  }
+
+  // ... (기존 selectAndSaveJudges 호출을 위한 래퍼 메서드가 필요하다면 추가)
+  // async selectAndSaveJudges(roomUuid: string) {
+  //   return this.aiJudgeService.selectAndSaveJudges(roomUuid);
+  // }
 }

@@ -12,6 +12,7 @@ import { JoinRoomDto } from './dto/join-room.dto';
 import { LeaveTeamDto } from './dto/leave-team.dto';
 import { Room, RoomConfig } from '../../common/types/room.type';
 import { User } from '../../common/types/user.type';
+import { AiJudgeService } from '../ai-judges/ai-judges.service';
 
 @WebSocketGateway({
   namespace: 'game',
@@ -24,7 +25,10 @@ export class RoomsGateway {
   @WebSocketServer() server: Server;
   private logger: Logger = new Logger('RoomsGateway');
 
-  constructor(private readonly roomsService: RoomsService) {}
+  constructor(
+    private readonly roomsService: RoomsService,
+    private readonly aiJudgeService: AiJudgeService,
+  ) {}
 
   /**
    * 1. 방 입장 (Setup -> GameRoom 진입 시)
@@ -206,6 +210,57 @@ export class RoomsGateway {
       };
     } catch (error) {
       this.logger.error(`leave_team failed: ${error.message}`);
+      return { status: 'error', message: error.message };
+    }
+  }
+
+  /**
+   * ⭐️ [신규] 자동 채우기 요청
+   * - 방장이 누르면 빈 슬롯에 관객을 채워넣음
+   */
+  @SubscribeMessage('auto_fill')
+  async handleAutoFill(@ConnectedSocket() client: Socket, @MessageBody() data: { roomId: string }) {
+    this.logger.log(`🤖 Auto-fill request by ${client.id}`);
+
+    try {
+      // Service 호출
+      const { updatedUsers, roomUuid } = await this.roomsService.autoFillSlots(client.id);
+
+      // 변경된 유저 리스트 방송 (화면에 누가 어디로 들어갔는지 보여줌)
+      this.server.to(roomUuid).emit('lobby_updated', {
+        users: updatedUsers,
+      });
+
+      return { status: 'success' };
+    } catch (error) {
+      return { status: 'error', message: error.message };
+    }
+  }
+
+  /**
+   * ⭐️ [변경] 게임 시작 요청
+   * - 이제는 "검증"만 하고 바로 시작함 (자동 채우기 로직 빠짐)
+   */
+  @SubscribeMessage('start_game')
+  async handleStartGame(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { roomId: string },
+  ) {
+    try {
+      // Service에서 조건 검사(풀방+전원레디) 후 시작 처리
+      const { roomUuid } = await this.roomsService.startGame(client.id);
+
+      // 심사위원 선정 (기존 로직 유지)
+      const judges = await this.aiJudgeService.selectAndSaveJudges(roomUuid);
+
+      // 게임 시작 방송
+      this.server.to(roomUuid).emit('game_started', {
+        judges: judges,
+      });
+
+      return { status: 'success' };
+    } catch (error) {
+      // 조건 불만족 시 에러 메시지 리턴 (프론트에서 alert 띄우기 용)
       return { status: 'error', message: error.message };
     }
   }
