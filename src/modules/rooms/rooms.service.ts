@@ -412,6 +412,21 @@ export class RoomsService {
     return { updatedUser, users, roomUuid: user.roomUuid };
   }
 
+  async updateRoomConfig(socketId: string, newConfig: any) {
+    const mapping = await this.roomsRepository.getMappingBySocketId(socketId);
+    const { roomUuid, userToken } = mapping;
+    const user = await this.roomsRepository.findUserByToken(roomUuid, userToken);
+    if (!user.isHost) throw new BadRequestException('방장만 설정을 변경할 수 있습니다.');
+
+    const room = await this.roomsRepository.findById(roomUuid);
+
+    // 설정 업데이트 및 저장
+    room.config = { ...room.config, ...newConfig };
+    await this.roomsRepository.save(room); // TTL 유지 로직 주의
+
+    return room;
+  }
+
   /**
    * 🏃 팀/자리 변경 로직
    */

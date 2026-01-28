@@ -10,6 +10,7 @@ import { Logger } from '@nestjs/common';
 import { RoomsService } from './rooms.service';
 import { JoinRoomDto } from './dto/join-room.dto';
 import { LeaveTeamDto } from './dto/leave-team.dto';
+import { Room, RoomConfig } from '../../common/types/room.type';
 import { User } from '../../common/types/user.type';
 
 @WebSocketGateway({
@@ -91,6 +92,18 @@ export class RoomsGateway {
     } catch (error) {
       this.logger.error(`정보 요청 실패: ${error.message}`);
     }
+  }
+
+  @SubscribeMessage('update_room_config')
+  async handleUpdateConfig(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { config: RoomConfig }, // 구체적인 Config 타입 사용 권장
+  ) {
+    // Service 호출
+    const room = await this.roomsService.updateRoomConfig(client.id, data.config);
+
+    // 변경된 설정 방송
+    this.server.to(room.roomUuid).emit('room_config_updated', { config: room.config });
   }
 
   @SubscribeMessage('game_ready')

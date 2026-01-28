@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import Redis from 'ioredis';
 
 import { redisKeys } from '../../common/constants/redis.keys';
@@ -23,11 +23,11 @@ export class RoomsRepository {
   }
 
   //방 검색
-  async findById(roomUuid: string): Promise<Room | null> {
+  async findById(roomUuid: string): Promise<Room> {
     const key = redisKeys.roomInfo(roomUuid);
     const raw = await this.client.get(key);
     if (!raw) {
-      return null;
+      throw new NotFoundException('room not found');
     }
     return JSON.parse(raw) as Room;
   }
@@ -96,22 +96,20 @@ export class RoomsRepository {
   }
 
   // [수정] 매핑 정보 파싱해서 가져오기
-  async getMappingBySocketId(
-    socketId: string,
-  ): Promise<{ roomUuid: string; userToken: string } | null> {
+  async getMappingBySocketId(socketId: string): Promise<{ roomUuid: string; userToken: string }> {
     const key = redisKeys.socketMap(socketId);
     const value = await this.client.get(key);
-    if (!value) return null;
+    if (!value) throw new NotFoundException('Socket mapping not found');
 
     const [roomUuid, userToken] = value.split(':');
     return { roomUuid, userToken };
   }
 
   // 👇 [추가] 유저 정보 조회 (삭제 전 정보 확인용)
-  async findUserByToken(roomUuid: string, userToken: string): Promise<User | null> {
+  async findUserByToken(roomUuid: string, userToken: string): Promise<User> {
     const key = redisKeys.roomUser(roomUuid, userToken);
     const data = await this.client.get(key);
-    if (!data) return null;
+    if (!data) throw new NotFoundException('user not found');
     return JSON.parse(data);
   }
 
