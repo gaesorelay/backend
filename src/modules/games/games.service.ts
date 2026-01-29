@@ -4,11 +4,13 @@ import { GameState } from './types/game-state.type';
 import { GAME_IMAGES } from './images.constant';
 import { EvaluateSubmissionDto } from '../ai-judges/dto/judge.dto';
 import { AiJudgeScore, TeamSide, VoteOutcome } from './types/vote-outcome.type';
+import { Server } from 'socket.io';
 
 @Injectable()
 export class GamesService {
   // 관객 투표는 DB가 아니라 서버 메모리에 저장한다.
   // 라운드 종료 시 resetVoteState로 정리한다.
+  private server: Server;
   private readonly voteStore = new Map<
     string,
     { votesTeamA: number; votesTeamB: number; aiApplied: boolean }
@@ -22,6 +24,16 @@ export class GamesService {
 
   constructor(private readonly gamesRepository: GamesRepository) {}
 
+  // Gateway가 생성될 때 Server 인스턴스를 넣어줌 (브로드캐스트용)
+  setServer(server: Server) {
+    this.server = server;
+  }
+
+  /**
+   * 게임 초기 상태 생성 (뼈대만 생성)
+   * - 이미지와 심사위원은 빈 배열로 초기화
+   * - 턴 종료 시간도 아직 시작 안 했으므로 0으로 설정
+   */
   async initGame(roomUuid: string, teamAIds: string[], teamBIds: string[]) {
     const initialState: GameState = {
       roomUuid,
@@ -162,5 +174,24 @@ export class GamesService {
       votesTeamB: state.votesTeamB,
       winner,
     };
+  }
+  /**
+   * 🔒 실시간 권한 검증 (DB 저장 X)
+   * - 현재 GameState를 읽어서, 보낸 사람이 해당 팀의 현재 턴인지 확인만 함
+   */
+  async validateWriter(roomUuid: string, userToken: string, team: 'A' | 'B'): Promise<boolean> {
+    const state = await this.gamesRepository.getGame(roomUuid);
+    if (!state) return false;
+
+    // 고정된 GameState 구조 사용
+    const orderList = team === 'A' ? state.teamAOrder : state.teamBOrder;
+    const storyList = team === 'A' ? state.teamAStory : state.teamBStory;
+
+    // 🧮 턴 계산: (이미 완성된 스토리 개수) % (전체 인원수)
+    const currentIndex = storyList.length % orderList.length;
+    const expectedToken = orderList[currentIndex];
+
+    // 지금 들어온 토큰이 작성할 차례인 토큰과 일치하는지 확인
+    return expectedToken === userToken;
   }
 }

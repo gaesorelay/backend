@@ -80,4 +80,14 @@ export class GamesRepository {
 
     await this.client.set(key, JSON.stringify(state), 'KEEPTTL');
   }
+
+  async addStorySegment(roomUuid: string, text: string) {
+    // 스토리 세그먼트를 리스트에 추가 (RPUSH)
+    await this.client.rpush(`game:${roomUuid}:story`, text);
+  }
+
+  async getFullStory(roomUuid: string) {
+    // 전체 스토리 가져오기 (LRANGE 0 -1)
+    return await this.client.lrange(`game:${roomUuid}:story`, 0, -1);
+  }
 }
