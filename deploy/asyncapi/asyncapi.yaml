@@ -1,0 +1,451 @@
+asyncapi: 3.0.0
+info:
+  title: 개소릴레이 WebSocket API
+  version: 1.2.0
+  description: "개소릴레이 게임 진행을 위한 WebSocket API 명세 (Namespace: /game)"
+
+servers:
+  dev:
+    host: localhost:8000
+    pathname: /game
+    protocol: socket.io
+    description: 로컬 개발 서버
+
+channels:
+  /:
+    address: /
+    messages:
+      # Client -> Server Messages
+      join_room:
+        $ref: '#/components/messages/JoinRoom'
+      request_room_info:
+        $ref: '#/components/messages/RequestRoomInfo'
+      update_room_config:
+        $ref: '#/components/messages/UpdateRoomConfig'
+      game_ready:
+        $ref: '#/components/messages/GameReady'
+      send_chat:
+        $ref: '#/components/messages/SendChat'
+      join_team:
+        $ref: '#/components/messages/JoinTeam'
+      leave_team:
+        $ref: '#/components/messages/LeaveTeam'
+      auto_fill:
+        $ref: '#/components/messages/AutoFill'
+      start_game:
+        $ref: '#/components/messages/StartGame'
+      leave_room:
+        $ref: '#/components/messages/LeaveRoom'
+      story_typing:
+        $ref: '#/components/messages/StoryTyping'
+      kick_user:
+        $ref: '#/components/messages/KickUser'
+      submit_vote:
+        $ref: '#/components/messages/SubmitVote'
+      request_judging:
+        $ref: '#/components/messages/RequestJudging'
+
+      # Server -> Client Messages
+      user_joined: # Legacy support
+        $ref: '#/components/messages/UserJoined'
+      user_left:
+        $ref: '#/components/messages/UserLeft'
+      lobby_updated:
+        $ref: '#/components/messages/LobbyUpdated'
+      room_info:
+        $ref: '#/components/messages/RoomInfo'
+      chat_message:
+        $ref: '#/components/messages/ChatMessage'
+      room_config_updated:
+        $ref: '#/components/messages/RoomConfigUpdated'
+      game_started:
+        $ref: '#/components/messages/GameStarted'
+      change_phase:
+        $ref: '#/components/messages/ChangePhase'
+      story_update:
+        $ref: '#/components/messages/StoryUpdate'
+      vote_updated:
+        $ref: '#/components/messages/VoteUpdated'
+      vote_result:
+        $ref: '#/components/messages/VoteResult'
+      judging_finished:
+        $ref: '#/components/messages/JudgingFinished'
+      error:
+        $ref: '#/components/messages/Error'
+
+operations:
+  receiveClientActions:
+    action: receive
+    channel:
+      $ref: '#/channels/~1'
+    messages:
+      - $ref: '#/channels/~1/messages/join_room'
+      - $ref: '#/channels/~1/messages/request_room_info'
+      - $ref: '#/channels/~1/messages/update_room_config'
+      - $ref: '#/channels/~1/messages/game_ready'
+      - $ref: '#/channels/~1/messages/send_chat'
+      - $ref: '#/channels/~1/messages/join_team'
+      - $ref: '#/channels/~1/messages/leave_team'
+      - $ref: '#/channels/~1/messages/auto_fill'
+      - $ref: '#/channels/~1/messages/start_game'
+      - $ref: '#/channels/~1/messages/leave_room'
+      - $ref: '#/channels/~1/messages/story_typing'
+      - $ref: '#/channels/~1/messages/kick_user'
+      - $ref: '#/channels/~1/messages/submit_vote'
+      - $ref: '#/channels/~1/messages/request_judging'
+
+  sendServerEvents:
+    action: send
+    channel:
+      $ref: '#/channels/~1'
+    messages:
+      - $ref: '#/channels/~1/messages/user_joined'
+      - $ref: '#/channels/~1/messages/user_left'
+      - $ref: '#/channels/~1/messages/lobby_updated'
+      - $ref: '#/channels/~1/messages/chat_message'
+      - $ref: '#/channels/~1/messages/room_config_updated'
+      - $ref: '#/channels/~1/messages/game_started'
+      - $ref: '#/channels/~1/messages/change_phase'
+      - $ref: '#/channels/~1/messages/story_update'
+      - $ref: '#/channels/~1/messages/vote_updated'
+      - $ref: '#/channels/~1/messages/vote_result'
+      - $ref: '#/channels/~1/messages/judging_finished'
+      - $ref: '#/channels/~1/messages/error'
+
+components:
+  messages:
+    # -----------------------------------------------------
+    # Client -> Server
+    # -----------------------------------------------------
+    JoinRoom:
+      name: join_room
+      title: 방 입장
+      summary: 유저가 방에 입장할 때 전송합니다.
+      payload:
+        type: object
+        properties:
+          roomId: 
+            type: string
+            description: 입장할 방의 UUID
+          nickname: 
+            type: string
+            description: 사용할 닉네임
+          avatarId: 
+            type: number
+            description: 선택한 아바타 ID
+          userToken: 
+            type: string
+            description: 기존 유저 재접속 시 토큰 (선택)
+        required: [roomId, nickname, avatarId]
+
+    RequestRoomInfo:
+      name: request_room_info
+      title: 방 정보 요청 (ACK)
+      summary: 방의 상세 정보를 요청하고 ACK 콜백으로 수신합니다.
+      payload:
+        type: object
+        properties:
+          roomId: 
+            type: string
+            description: 조회를 원하는 방 UUID
+        required: [roomId]
+
+    UpdateRoomConfig:
+      name: update_room_config
+      title: 방 설정 변경
+      summary: 방장이 게임 설정을 변경할 때 전송합니다.
+      payload:
+        type: object
+        properties:
+          config: 
+            type: object
+            description: 변경할 설정 객체
+        required: [config]
+
+    GameReady:
+      name: game_ready
+      title: 준비 토글
+      summary: 플레이어가 준비 완료/취소 상태를 변경할 때 전송합니다.
+      payload:
+        type: object
+        properties:
+          isReady: 
+            type: boolean
+            description: 준비 여부 (true/false)
+        required: [isReady]
+    
+    SendChat:
+      name: send_chat
+      title: 채팅 전송
+      summary: 채팅 메시지를 보낼 때 전송합니다.
+      payload:
+        type: object
+        properties:
+          message: 
+            type: string
+            description: 채팅 내용
+        required: [message]
+
+    JoinTeam:
+      name: join_team
+      title: 팀/슬롯 선택
+      summary: 특정 팀의 슬롯으로 이동할 때 전송합니다.
+      payload:
+        type: object
+        properties:
+          public_user_id: 
+            type: number
+            description: 대상 유저의 공개 ID
+          slot_index: 
+            type: number
+            description: 이동할 슬롯 인덱스 (0~3)
+          team: 
+            type: string
+            enum: [A, B]
+            description: 이동할 팀 (A 또는 B)
+        required: [public_user_id, slot_index, team]
+
+    LeaveTeam:
+      name: leave_team
+      title: 팀 나가기 (관전 전환)
+      summary: 플레이어 슬롯에서 나와 관전자로 전환할 때 전송합니다.
+      payload:
+        type: object
+        properties:
+          public_user_id: 
+            type: number
+            description: 대상 유저의 공개 ID
+          slot_index: 
+            type: number
+            description: 현재 슬롯 인덱스 (참조용)
+          team: 
+            type: string
+            description: 현재 팀 (참조용)
+        required: [public_user_id, slot_index, team]
+
+    AutoFill:
+      name: auto_fill
+      title: 자동 채우기 (방장)
+      summary: 빈 슬롯을 관전자로 무작위 채웁니다.
+      payload:
+        type: object
+        properties:
+          roomId: 
+            type: string
+            description: 방 UUID
+        required: [roomId]
+
+    StartGame:
+      name: start_game
+      title: 게임 시작
+      summary: 모든 조건이 충족되었을 때 게임을 시작합니다. (방장만 가능했으나 변경됨)
+      payload:
+        type: object
+        properties:
+          roomId: 
+            type: string
+            description: 방 UUID
+        required: [roomId]
+
+    LeaveRoom:
+      name: leave_room
+      title: 방 퇴장
+      summary: 유저가 방에서 퇴장할 때 전송합니다.
+      payload:
+        type: object
+        properties:
+        required: []
+
+    StoryTyping:
+      name: story_typing
+      title: 스토리 입력 중
+      summary: 플레이어가 스토리를 작성 중일 때 전송합니다.
+      payload:
+        type: object
+        properties:
+          roomId:
+            type: string
+            description: 방 UUID
+          text:
+            type: string
+            description: 입력 중인 텍스트
+          team:
+            type: string
+            enum: [A, B]
+            description: 팀 정보
+          userToken:
+            type: string
+            description: 유저 토큰
+        required: [roomId, text, team, userToken]
+
+    KickUser:
+      name: kick_user
+      title: 유저 강퇴 (방장)
+      summary: 특정 유저를 방에서 강제로 퇴장시킵니다.
+      payload:
+        type: object
+        properties:
+          public_user_id: 
+            type: number
+            description: 강퇴할 유저의 공개 ID
+        required: [public_user_id]
+    
+    SubmitVote:
+      name: submit_vote
+      title: 투표 제출
+      summary: 관객이 특정 팀에 투표할 때 전송합니다.
+      payload:
+        type: object
+        properties:
+          team:
+            type: string
+            enum: [A, B]
+            description: 투표할 팀
+        required: [team]
+
+    RequestJudging:
+      name: request_judging
+      title: 심사 요청
+      summary: 게임 종료 후 AI 심사를 요청할 때 전송합니다. (현재 자동화됨)
+      payload:
+        type: object
+        properties:
+          roomId: 
+            type: string
+            description: 방 UUID
+        required: [roomId]
+
+    # -----------------------------------------------------
+    # Server -> Client
+    # -----------------------------------------------------
+    UserJoined:
+      name: user_joined
+      title: 유저 입장 (Legacy)
+      summary: 유저 입장 알림 (lobby_updated로 대체됨)
+      payload:
+        type: object
+        properties:
+          nickname: { type: string }
+
+    UserLeft:
+      name: user_left
+      title: 유저 퇴장
+      summary: 유저가 방에서 나갔음을 알립니다.
+      payload:
+        type: object
+        properties:
+          nickname: { type: string, description: 퇴장한 유저 닉네임 }
+
+    LobbyUpdated:
+      name: lobby_updated
+      title: 로비 상태 전체 갱신
+      summary: 유저 목록이나 상태가 변경되었을 때 최신 정보를 전송합니다.
+      payload:
+        type: object
+        properties:
+          users: 
+            type: array
+            description: 최신 유저 목록
+          updatedUser: 
+            type: object
+            description: 변경된 특정 유저 정보 (선택)
+
+    ChatMessage:
+      name: chat_message
+      title: 채팅 수신
+      summary: 다른 유저의 채팅이나 시스템 메시지를 수신합니다.
+      payload:
+        type: object
+        properties:
+          senderId: { type: string, description: 보낸 유저 소켓 ID }
+          nickname: { type: string, description: 보낸 유저 닉네임 }
+          message: { type: string, description: 메시지 내용 }
+          type: { type: string, description: 메시지 타입 (일반/시스템) }
+          avatarId: { type: number, description: 아바타 ID }
+          team: { type: string, description: 팀 정보 (A/B/null) }
+          isHost: { type: boolean, description: 방장 여부 }
+          timestamp: { type: number, description: 전송 시간 }
+
+    RoomConfigUpdated:
+      name: room_config_updated
+      title: 방 설정 변경 알림
+      summary: 변경된 방 설정을 모든 유저에게 알립니다.
+      payload:
+        type: object
+        properties:
+          config: { type: object, description: 변경된 설정 }
+
+    GameStarted:
+      name: game_started
+      title: 게임 시작 알림
+      summary: 게임이 시작되었음을 알리고 초기 데이터를 전송합니다.
+      payload:
+        type: object
+        properties:
+          imageIds: { type: array, description: 선정된 이미지 ID 목록 }
+          judges: { type: array, description: 선정된 심사위원 목록 }
+
+    ChangePhase:
+      name: change_phase
+      title: 게임 페이즈 변경
+      summary: 게임 단계(대기, 라운드, 투표 등)가 변경됨을 알립니다.
+      payload:
+        type: object
+        properties:
+          status: { type: string, description: 현재 페이즈 (WAITING/PLAYING/VOTING/ENDED) }
+          displayStatus: { type: string, description: 화면 표시용 상태 메시지 }
+          startAt: { type: number, description: 시작 시간 }
+          durationMs: { type: number, description: 지속 시간(ms) }
+
+    StoryUpdate:
+      name: story_update
+      title: 스토리 업데이트
+      summary: 다른 플레이어가 작성 중인 스토리를 실시간으로 수신합니다.
+      payload:
+        type: object
+        properties:
+          team: { type: string, enum: [A, B], description: 팀 정보 }
+          text: { type: string, description: 작성 중인 텍스트 }
+          writerToken: { type: string, description: 작성자 토큰 }
+
+    VoteUpdated:
+      name: vote_updated
+      title: 실시간 투표 현황
+      summary: 투표 진행 중 실시간 득표수를 알립니다.
+      payload:
+        type: object
+        properties:
+          votesTeamA: { type: number, description: A팀 득표수 }
+          votesTeamB: { type: number, description: B팀 득표수 }
+
+    VoteResult:
+      name: vote_result
+      title: 최종 투표 결과
+      summary: 투표 및 심사가 완료된 후 최종 결과를 알립니다.
+      payload:
+        type: object
+        properties:
+          votesTeamA: { type: number }
+          votesTeamB: { type: number }
+          winner: { type: string, enum: [A, B, DRAW] }
+          totalScoreA: { type: number, description: AI 점수 포함 총점 A }
+          totalScoreB: { type: number, description: AI 점수 포함 총점 B }
+          judgeScores: { type: array, description: 심사위원별 점수 상세 }
+
+    JudgingFinished:
+      name: judging_finished
+      title: 심사 완료 알림
+      summary: AI 심사가 완료되었음을 알립니다.
+      payload:
+        type: object
+        properties:
+          results: { type: array, description: 심사 결과 목록 }
+
+    Error:
+      name: error
+      title: 에러 알림
+      summary: 요청 처리 중 발생한 에러를 알립니다.
+      payload:
+        type: object
+        properties:
+          message: { type: string, description: 에러 메시지 }
