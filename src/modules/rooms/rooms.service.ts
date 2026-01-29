@@ -475,13 +475,13 @@ export class RoomsService {
    */
   async startGame(socketId: string) {
     const mapping = await this.roomsRepository.getMappingBySocketId(socketId);
-    if (!mapping) throw new NotFoundException();
+    // if (!mapping) throw new NotFoundException();
 
-    const requester = await this.roomsRepository.findUserByToken(
-      mapping.roomUuid,
-      mapping.userToken,
-    );
-    if (!requester.isHost) throw new BadRequestException('방장만 시작할 수 있습니다.');
+    // const requester = await this.roomsRepository.findUserByToken(
+    //   mapping.roomUuid,
+    //   mapping.userToken,
+    // );
+    // if (!requester.isHost) throw new BadRequestException('방장만 시작할 수 있습니다.');
 
     const roomUuid = mapping.roomUuid;
     const room = await this.roomsRepository.findById(roomUuid);
@@ -502,13 +502,13 @@ export class RoomsService {
     // 플레이어(팀이 있는 사람)만 체크합니다. 방장은 제외할지 포함할지 결정해야 함.
     // 보통 방장은 시작 버튼 누르는 사람이니 Ready가 true여야 하거나, 체크에서 제외합니다.
     // 여기서는 "방장 포함 모든 플레이어 Ready"로 구현합니다.
-    const notReadyPlayers = users.filter((u) => u.role === 'PLAYER' && !u.isReady);
+    // const notReadyPlayers = users.filter((u) => u.role === 'PLAYER' && !u.isReady);
 
-    if (notReadyPlayers.length > 0) {
-      // 누구누구 안 했는지 알려주면 좋음
-      const names = notReadyPlayers.map((u) => u.nickname).join(', ');
-      throw new BadRequestException(`준비하지 않은 유저가 있습니다: ${names}`);
-    }
+    // if (notReadyPlayers.length > 0) {
+    //   // 누구누구 안 했는지 알려주면 좋음
+    //   const names = notReadyPlayers.map((u) => u.nickname).join(', ');
+    //   throw new BadRequestException(`준비하지 않은 유저가 있습니다: ${names}`);
+    // }
 
     // 3. 게임 상태 초기화 및 DB 저장
     // 팀원 순서대로 ID 추출
