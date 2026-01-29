@@ -60,21 +60,6 @@ export class RoomsRepository {
     return this.client.incr(key);
   }
 
-  // 👇 [추가 2] 특정 방의 현재 인원 수 조회
-  async getUserCount(roomUuid: string): Promise<number> {
-    const pattern = redisKeys.roomUsers(roomUuid);
-
-    // 👇 [로그 추가] 검색할 때 어떤 패턴을 쓰는지 확인
-    // console.log(`🔎 [Redis 검색] Pattern: ${pattern}`);
-
-    const keys = await this.client.keys(pattern);
-
-    // 👇 [로그 추가] 몇 개나 찾았는지 확인
-    // console.log(`🔢 [Redis 카운트] 발견된 키 개수: ${keys.length}`, keys);
-
-    return keys.length;
-  }
-
   // [수정] 소켓 매핑 저장: roomUuid와 userToken을 같이 저장
   async saveSocketMapping(socketId: string, roomUuid: string, userToken: string): Promise<void> {
     const key = redisKeys.socketMap(socketId);
@@ -82,17 +67,49 @@ export class RoomsRepository {
     await this.client.set(key, value);
   }
 
-  // 👇 [추가 4] 방의 모든 유저 목록 가져오기 (이미 입장한 유저 체크용)
-  async findAllUsersInRoom(roomUuid: string): Promise<User[]> {
-    const pattern = redisKeys.roomUsers(roomUuid);
-    const keys = await this.client.keys(pattern);
+  /// 방명록에 유저 토큰 추가 (입장 시) Redis Key: room:{uuid}:users (Set 구조)
+  async addUserToRoomList(roomUuid: string, userToken: string): Promise<void> {
+    const key = `room:${roomUuid}:users`;
+    await this.client.sadd(key, userToken);
+    // 방 데이터랑 수명을 맞추기 위해 TTL 설정 (선택사항)
+    await this.client.expire(key, 60 * 60 * 12);
+  }
 
-    if (keys.length === 0) return [];
+  // 방명록에서 유저 토큰 제거 (퇴장 시)
+  async removeUserFromRoomList(roomUuid: string, userToken: string): Promise<void> {
+    const key = `room:${roomUuid}:users`;
+    await this.client.srem(key, userToken); // SREM: Set에서 제거
+  }
 
-    // 여러 키의 값을 한 번에 가져옴 (MGET)
-    const rawUsers = await this.client.mget(keys);
+  // 방에 있는 모든 유저 토큰 가져오기
+  async getUserTokensInRoom(roomUuid: string): Promise<string[]> {
+    const key = `room:${roomUuid}:users`;
+    return await this.client.smembers(key); // SMEMBERS: 모든 멤버 조회
+  }
 
-    return rawUsers.filter((raw) => raw !== null).map((raw) => JSON.parse(raw) as User);
+  // 방에 있는 모든 유저의 '상세 정보'까지 한 번에 가져오기
+  async getUsersInRoom(roomUuid: string): Promise<User[]> {
+    const tokens = await this.getUserTokensInRoom(roomUuid);
+    if (tokens.length === 0) return [];
+
+    // 각 토큰으로 유저 정보 조회 (병렬 처리)
+    const users: User[] = [];
+    for (const token of tokens) {
+      const user = await this.findUserByTokenOrNull(roomUuid, token);
+      if (user) {
+        users.push(user);
+      } else {
+        // (예외 처리) 리스트엔 있는데 실제 데이터가 만료돼서 없으면 리스트에서도 지워줌
+        await this.removeUserFromRoomList(roomUuid, token);
+      }
+    }
+    return users;
+  }
+
+  // 현재 방 인원수 조회 (최적화)
+  async getUserCount(roomUuid: string): Promise<number> {
+    const key = `room:${roomUuid}:users`;
+    return await this.client.scard(key); // SCARD: Set의 개수 조회
   }
 
   // [수정] 매핑 정보 파싱해서 가져오기

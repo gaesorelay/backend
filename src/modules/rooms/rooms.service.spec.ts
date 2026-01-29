@@ -14,8 +14,9 @@ describe('RoomsService.joinTeam', () => {
     getMappingBySocketId: jest.Mock;
     findUserByToken: jest.Mock;
     findUserByTokenOrNull: jest.Mock;
-    findAllUsersInRoom: jest.Mock;
+    getUsersInRoom: jest.Mock;
     saveUser: jest.Mock;
+    addUserToRoomList: jest.Mock;
   };
 
   const roomUuid = 'ROOM123';
@@ -25,8 +26,9 @@ describe('RoomsService.joinTeam', () => {
       getMappingBySocketId: jest.fn(),
       findUserByToken: jest.fn(),
       findUserByTokenOrNull: jest.fn(),
-      findAllUsersInRoom: jest.fn(),
+      getUsersInRoom: jest.fn(),
       saveUser: jest.fn(),
+      addUserToRoomList: jest.fn(),
     };
     // ⭐️ [수정] gamesService, timerService 추가 주입
     service = new RoomsService(
@@ -70,7 +72,7 @@ describe('RoomsService.joinTeam', () => {
       userToken: requester.userToken,
     });
     roomsRepository.findUserByToken.mockResolvedValue(requester);
-    roomsRepository.findAllUsersInRoom.mockResolvedValue([requester, target]);
+    roomsRepository.getUsersInRoom.mockResolvedValue([requester, target]);
 
     const result = await service.joinTeam('socket1', 2, 1, 'A');
 
@@ -120,7 +122,7 @@ describe('RoomsService.joinTeam', () => {
       userToken: requester.userToken,
     });
     roomsRepository.findUserByToken.mockResolvedValue(requester);
-    roomsRepository.findAllUsersInRoom.mockResolvedValue([requester, target]);
+    roomsRepository.getUsersInRoom.mockResolvedValue([requester, target]);
 
     await expect(service.joinTeam('socket1', 2, 1, 'A')).rejects.toBeInstanceOf(
       BadRequestException,
@@ -148,7 +150,7 @@ describe('RoomsService.joinTeam', () => {
       userToken: requester.userToken,
     });
     roomsRepository.findUserByToken.mockResolvedValue(requester);
-    roomsRepository.findAllUsersInRoom.mockResolvedValue([requester]);
+    roomsRepository.getUsersInRoom.mockResolvedValue([requester]);
 
     const result = await service.joinTeam('socket1', 2, 0, 'B');
 
@@ -178,7 +180,7 @@ describe('RoomsService.joinTeam', () => {
       userToken: requester.userToken,
     });
     roomsRepository.findUserByToken.mockResolvedValue(requester);
-    roomsRepository.findAllUsersInRoom.mockResolvedValue([requester]);
+    roomsRepository.getUsersInRoom.mockResolvedValue([requester]);
 
     await expect(service.joinTeam('socket1', 1, 0, 'C')).rejects.toBeInstanceOf(
       BadRequestException,
@@ -205,6 +207,7 @@ describe('RoomsService.joinRoom', () => {
     getUserCount: jest.Mock;
     saveUser: jest.Mock;
     nextPublicUserId: jest.Mock;
+    addUserToRoomList: jest.Mock;
   };
 
   const roomUuid = 'ROOM123';
@@ -235,6 +238,7 @@ describe('RoomsService.joinRoom', () => {
       getUserCount: jest.fn(),
       saveUser: jest.fn(),
       nextPublicUserId: jest.fn(),
+      addUserToRoomList: jest.fn(),
     };
     // ⭐️ [수정] gamesService, timerService 추가 주입
     service = new RoomsService(
@@ -346,7 +350,7 @@ describe('RoomsService.leaveTeam', () => {
     getMappingBySocketId: jest.Mock;
     findUserByToken: jest.Mock;
     findUserByTokenOrNull: jest.Mock;
-    findAllUsersInRoom: jest.Mock;
+    getUsersInRoom: jest.Mock;
     saveUser: jest.Mock;
   };
 
@@ -357,7 +361,7 @@ describe('RoomsService.leaveTeam', () => {
       getMappingBySocketId: jest.fn(),
       findUserByToken: jest.fn(),
       findUserByTokenOrNull: jest.fn(),
-      findAllUsersInRoom: jest.fn(),
+      getUsersInRoom: jest.fn(),
       saveUser: jest.fn(),
     };
     // ⭐️ [수정] gamesService, timerService 추가 주입
@@ -401,7 +405,7 @@ describe('RoomsService.leaveTeam', () => {
       userToken: requester.userToken,
     });
     roomsRepository.findUserByToken.mockResolvedValue(requester);
-    roomsRepository.findAllUsersInRoom.mockResolvedValue([requester, target]);
+    roomsRepository.getUsersInRoom.mockResolvedValue([requester, target]);
 
     const result = await service.leaveTeam('socket1', 2, 1, 'A');
 
@@ -438,7 +442,7 @@ describe('RoomsService.leaveTeam', () => {
       userToken: requester.userToken,
     });
     roomsRepository.findUserByToken.mockResolvedValue(requester);
-    roomsRepository.findAllUsersInRoom.mockResolvedValue([requester]);
+    roomsRepository.getUsersInRoom.mockResolvedValue([requester]);
 
     const result = await service.leaveTeam('socket1', 2, 2, 'B');
 
@@ -481,7 +485,7 @@ describe('RoomsService.leaveTeam', () => {
       userToken: requester.userToken,
     });
     roomsRepository.findUserByToken.mockResolvedValue(requester);
-    roomsRepository.findAllUsersInRoom.mockResolvedValue([requester, target]);
+    roomsRepository.getUsersInRoom.mockResolvedValue([requester, target]);
 
     await expect(service.leaveTeam('socket1', 2, 1, 'A')).rejects.toBeInstanceOf(
       BadRequestException,
@@ -508,7 +512,7 @@ describe('RoomsService.leaveTeam', () => {
       userToken: requester.userToken,
     });
     roomsRepository.findUserByToken.mockResolvedValue(requester);
-    roomsRepository.findAllUsersInRoom.mockResolvedValue([requester]);
+    roomsRepository.getUsersInRoom.mockResolvedValue([requester]);
 
     await expect(service.leaveTeam('socket1', 2, 1, 'C')).rejects.toBeInstanceOf(
       BadRequestException,
@@ -529,7 +533,7 @@ describe('RoomsService.setUserReady', () => {
     findUserByToken: jest.Mock;
     findUserByTokenOrNull: jest.Mock;
     saveUser: jest.Mock;
-    findAllUsersInRoom: jest.Mock;
+    getUsersInRoom: jest.Mock;
   };
 
   const roomUuid = 'ROOM123';
@@ -540,7 +544,7 @@ describe('RoomsService.setUserReady', () => {
       findUserByToken: jest.fn(),
       findUserByTokenOrNull: jest.fn(),
       saveUser: jest.fn(),
-      findAllUsersInRoom: jest.fn(),
+      getUsersInRoom: jest.fn(),
     };
     // ⭐️ [수정] gamesService, timerService 추가 주입
     service = new RoomsService(
@@ -570,7 +574,7 @@ describe('RoomsService.setUserReady', () => {
       userToken: user.userToken,
     });
     roomsRepository.findUserByToken.mockResolvedValue(user);
-    roomsRepository.findAllUsersInRoom.mockResolvedValue([user]);
+    roomsRepository.getUsersInRoom.mockResolvedValue([user]);
 
     const result = await service.setUserReady('socket1', true);
 
@@ -607,7 +611,7 @@ describe('RoomsService.kickUser', () => {
     getMappingBySocketId: jest.Mock;
     findUserByToken: jest.Mock;
     findUserByTokenOrNull: jest.Mock;
-    findAllUsersInRoom: jest.Mock;
+    getUsersInRoom: jest.Mock;
     deleteUser: jest.Mock;
   };
 
@@ -618,7 +622,7 @@ describe('RoomsService.kickUser', () => {
       getMappingBySocketId: jest.fn(),
       findUserByToken: jest.fn(),
       findUserByTokenOrNull: jest.fn(),
-      findAllUsersInRoom: jest.fn(),
+      getUsersInRoom: jest.fn(),
       deleteUser: jest.fn(),
     };
     // ⭐️ [수정] gamesService, timerService 추가 주입
@@ -662,7 +666,7 @@ describe('RoomsService.kickUser', () => {
       userToken: requester.userToken,
     });
     roomsRepository.findUserByToken.mockResolvedValue(requester);
-    roomsRepository.findAllUsersInRoom.mockResolvedValue([requester, target]);
+    roomsRepository.getUsersInRoom.mockResolvedValue([requester, target]);
 
     const result = await service.kickUser('socket1', 2);
 
@@ -711,7 +715,7 @@ describe('RoomsService.kickUser', () => {
       userToken: requester.userToken,
     });
     roomsRepository.findUserByToken.mockResolvedValue(requester);
-    roomsRepository.findAllUsersInRoom.mockResolvedValue([requester, target]);
+    roomsRepository.getUsersInRoom.mockResolvedValue([requester, target]);
 
     await expect(service.kickUser('socket1', 2)).rejects.toBeInstanceOf(BadRequestException);
   });
@@ -752,7 +756,7 @@ describe('RoomsService.kickUser', () => {
       userToken: requester.userToken,
     });
     roomsRepository.findUserByToken.mockResolvedValue(requester);
-    roomsRepository.findAllUsersInRoom.mockResolvedValue([requester]);
+    roomsRepository.getUsersInRoom.mockResolvedValue([requester]);
 
     await expect(service.kickUser('socket1', 2)).rejects.toBeInstanceOf(NotFoundException);
   });

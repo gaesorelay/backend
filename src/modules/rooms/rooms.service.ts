@@ -151,7 +151,7 @@
 //     };
 
 //     await this.roomsRepository.saveUser(updatedUser);
-//     const users = await this.roomsRepository.findAllUsersInRoom(user.roomUuid);
+//     const users = await this.roomsRepository.getUsersInRoom(user.roomUuid);
 
 //     return { updatedUser, users, roomUuid: user.roomUuid };
 //   }
@@ -188,7 +188,7 @@
 //       throw new BadRequestException('Invalid team.');
 //     }
 
-//     const users = await this.roomsRepository.findAllUsersInRoom(mapping.roomUuid);
+//     const users = await this.roomsRepository.getUsersInRoom(mapping.roomUuid);
 //     const target = users.find((user) => user.publicUserId === targetPublicUserId);
 //     if (!target) {
 //       throw new NotFoundException('Target user not found.');
@@ -319,7 +319,7 @@ export class RoomsService {
     nickname: string,
     socketId: string,
     avatarId: number,
-    userToken?: string,
+    userToken?: string, // 클라이언트가 가져온 토큰 (방장이면 createRoom 때 받은 것)
   ): Promise<User> {
     // 1. 방 존재 여부 확인
     const room = await this.roomsRepository.findById(roomUuid);
@@ -327,7 +327,8 @@ export class RoomsService {
       throw new NotFoundException('존재하지 않는 방입니다.');
     }
 
-    // 2. 재접속 시도 확인
+    // 2. 재접속 시도 확인 (DB에 유저 정보가 있는지 체크)
+    // 아까 만든 findUserByTokenOrNull 사용
     if (userToken) {
       const existingUser = await this.roomsRepository.findUserByTokenOrNull(roomUuid, userToken);
       if (existingUser) {
@@ -343,35 +344,30 @@ export class RoomsService {
 
     // 3. 인원 수 체크
     const currentCount = await this.roomsRepository.getUserCount(roomUuid);
-    // config에 따라 최대 인원 계산 (기본값 처리)
     const maxUser = room.config.maxPlayers || 8;
 
     if (currentCount >= maxUser) {
       throw new BadRequestException('방이 꽉 찼습니다.');
     }
 
-    // 4. 신규 유저 생성 로직
-    // 방장 토큰과 일치하는지 확인
-    const isOwnerToken = userToken === room.ownerUserToken;
+    // 방에 사람이 0명이면, 지금 들어오는 사람이 무조건 방장입니다.
+    const isFirstUser = currentCount === 0;
+    const isHost = isFirstUser;
 
-    // 보안 체크: 토큰을 보냈는데 Redis에도 없고 방장 토큰도 아니면 에러 (혹은 무시하고 게스트 처리)
-    if (userToken && !isOwnerToken) {
-      throw new UnauthorizedException('유효하지 않은 유저 토큰입니다.');
-    }
+    // - 클라이언트가 토큰을 들고 왔으면(createRoom 직후) 그 토큰 사용
+    // - 빈손으로 왔으면(초대 링크 등) 새로 발급
+    const newUserToken = userToken ? userToken : generateUUIDToken();
 
-    // 호스트 여부 결정 (토큰이 방장꺼면 호스트)
-    const isHost = isOwnerToken;
-
-    // 입장하면 기본적으로 AUDIENCE(관전) & 팀 없음
+    // 역할 및 팀 설정
+    // - 처음엔 팀/슬롯 없음, 역할은 관전자(AUDIENCE)로 시작
+    // - 단, 호스트 권한(isHost)은 True
     const role: UserRole = 'AUDIENCE';
     const team: UserTeam = null;
     const slotIndex: number | null = null;
 
-    // 호스트면 방 생성 때 만든 토큰 사용, 아니면 새로 발급
-    const newUserToken = isHost ? userToken : generateUUIDToken();
     const publicUserId = await this.roomsRepository.nextPublicUserId(roomUuid);
 
-    // 아바타 랜덤 설정
+    // 아바타 랜덤 (없으면)
     const resolvedAvatarId = avatarId ?? Math.floor(Math.random() * 5) + 1;
 
     const newUser: User = {
@@ -381,9 +377,8 @@ export class RoomsService {
       roomUuid: roomUuid,
       nickname: nickname,
 
-      // ✨ 변경된 필드들
       role: role,
-      isHost: isHost, // boolean 값
+      isHost: isHost,
       team: team,
       slotIndex: slotIndex,
 
@@ -394,6 +389,9 @@ export class RoomsService {
     // 5. Redis 저장
     await this.roomsRepository.saveUser(newUser);
     await this.roomsRepository.saveSocketMapping(socketId, roomUuid, newUserToken);
+
+    // 유저 리스트에 추가
+    await this.roomsRepository.addUserToRoomList(roomUuid, newUserToken);
 
     return newUser;
   }
@@ -433,7 +431,7 @@ export class RoomsService {
 
   async getUsersInRoom(roomUuid: string): Promise<User[]> {
     //방의 유저 정보 조회
-    return this.roomsRepository.findAllUsersInRoom(roomUuid);
+    return this.roomsRepository.getUsersInRoom(roomUuid);
   }
 
   async setUserReady(socketId: string, isReady: boolean) {
@@ -449,7 +447,7 @@ export class RoomsService {
     };
 
     await this.roomsRepository.saveUser(updatedUser);
-    const users = await this.roomsRepository.findAllUsersInRoom(user.roomUuid);
+    const users = await this.roomsRepository.getUsersInRoom(user.roomUuid);
 
     return { updatedUser, users, roomUuid: user.roomUuid };
   }
@@ -500,7 +498,7 @@ export class RoomsService {
       throw new BadRequestException('Invalid team. Use "A" or "B".');
     }
 
-    const users = await this.roomsRepository.findAllUsersInRoom(mapping.roomUuid);
+    const users = await this.roomsRepository.getUsersInRoom(mapping.roomUuid);
     const target = users.find((user) => user.publicUserId === targetPublicUserId);
     if (!target) throw new NotFoundException('Target user not found.');
 
@@ -559,7 +557,7 @@ export class RoomsService {
     }
 
     // 4) 대상 유저 조회
-    const users = await this.roomsRepository.findAllUsersInRoom(mapping.roomUuid);
+    const users = await this.roomsRepository.getUsersInRoom(mapping.roomUuid);
     const target = users.find((user) => user.publicUserId === targetPublicUserId);
     if (!target) throw new NotFoundException('Target user not found.');
 
@@ -606,7 +604,7 @@ export class RoomsService {
     }
 
     // 3) 대상 유저 조회
-    const users = await this.roomsRepository.findAllUsersInRoom(mapping.roomUuid);
+    const users = await this.roomsRepository.getUsersInRoom(mapping.roomUuid);
     const target = users.find((user) => user.publicUserId === targetPublicUserId);
     if (!target) throw new NotFoundException('Target user not found.');
 
@@ -677,7 +675,7 @@ export class RoomsService {
 
     const roomUuid = mapping.roomUuid;
     const room = await this.roomsRepository.findById(roomUuid);
-    const users = await this.roomsRepository.findAllUsersInRoom(roomUuid);
+    const users = await this.roomsRepository.getUsersInRoom(roomUuid);
 
     // 2. 빈 슬롯 파악
     const TEAM_SIZE = room.config.storytellerCount || 4; // 기본값 4
@@ -734,7 +732,7 @@ export class RoomsService {
     }
 
     // 5. 전체 유저 리스트 다시 조회 (방송용)
-    const allUsers = await this.roomsRepository.findAllUsersInRoom(roomUuid);
+    const allUsers = await this.roomsRepository.getUsersInRoom(roomUuid);
 
     return { updatedUsers: allUsers, roomUuid };
   }
@@ -756,7 +754,7 @@ export class RoomsService {
 
     const roomUuid = mapping.roomUuid;
     const room = await this.roomsRepository.findById(roomUuid);
-    const users = await this.roomsRepository.findAllUsersInRoom(roomUuid);
+    const users = await this.roomsRepository.getUsersInRoom(roomUuid);
     const TEAM_SIZE = room.config.storytellerCount || 4;
 
     // 1. 슬롯 검증 (풀방 체크)
