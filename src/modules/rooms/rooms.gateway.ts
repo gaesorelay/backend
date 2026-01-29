@@ -352,21 +352,14 @@ export class RoomsGateway {
       // 4. ⭐️ [수정] 게임 흐름 시작 (이벤트 이름 change_phase로 통일)
       await this.roomsService.startGameFlow(
         roomUuid,
-        (phase, durationMs) => {
-          // Service에서 넘어오는 phase는 'CARD_SHUFFLE', 'WRITING' 같은 문자열임
-          this.server.to(roomUuid).emit('change_phase', {
-            phase: phase,      // 프론트엔드가 기다리는 키값 ('phase')
-            data: {            // 추가 데이터가 필요하다면 여기에 담음
-               duration: durationMs 
-            }
-          });
+        (status, durationMs, displayStatus) => {
+          this.emitPhase(roomUuid, status, durationMs, displayStatus);
         },
         (outcome) => {
           this.server.to(roomUuid).emit('vote_result', outcome);
         },
       );
 
-      
       return { status: 'success' };
     } catch (error) {
       // 조건 미충족 등 에러 메시지 반환
@@ -374,8 +367,6 @@ export class RoomsGateway {
       return { status: 'error', message: error.message };
     }
   }
-
-
 
   @SubscribeMessage('submit_vote')
   async handleSubmitVote(
@@ -404,7 +395,6 @@ export class RoomsGateway {
 
   // AI 투표 반영은 VOTING 시작 시점에 내부 로직으로 처리
 
-  
   /**
    * 6. 유저 강퇴 (방장만 가능)
    */
@@ -434,9 +424,15 @@ export class RoomsGateway {
       return { status: 'error', message: error.message };
     }
   }
-  private emitPhase(roomUuid: string, status: RoomStatus, durationMs: number) {
-    this.server.to(roomUuid).emit('game_phase_changed', {
+  private emitPhase(
+    roomUuid: string,
+    status: RoomStatus,
+    durationMs: number,
+    displayStatus?: string,
+  ) {
+    this.server.to(roomUuid).emit('change_phase', {
       status,
+      displayStatus: displayStatus ?? status,
       startAt: Date.now(),
       durationMs,
     });
