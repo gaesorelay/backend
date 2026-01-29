@@ -12,6 +12,7 @@ export interface RoomConfig {
 
 export interface Room {
   roomUuid: string;
+  inviteCode: string;
   ownerUserToken: string;
   title: string;
   status: RoomStatus; // 위에서 정의한 WAITING | PLAYING | ENDED

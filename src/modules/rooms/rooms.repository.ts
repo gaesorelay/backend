@@ -113,6 +113,16 @@ export class RoomsRepository {
     return JSON.parse(data);
   }
 
+  async findUserByTokenOrNull(roomUuid: string, token: string): Promise<User | null> {
+    const key = redisKeys.roomUser(roomUuid, token);
+    const data = await this.client.get(key);
+
+    if (!data) {
+      return null; // 에러 대신 null 반환
+    }
+    return JSON.parse(data);
+  }
+
   // 👇 [추가] 유저 데이터 삭제 (유저 정보 + 소켓 매핑)
   async deleteUser(roomUuid: string, userToken: string, socketId: string): Promise<void> {
     const userKey = redisKeys.roomUser(roomUuid, userToken);
@@ -178,6 +188,11 @@ export class RoomsRepository {
       // ⚠️ 주의: set을 하면 기존 TTL이 사라질 수 있으므로, TTL 설정은 set 직후에 해야 함
       // (이 로직은 Service에서 제어하는 게 안전)
     }
+  }
+
+  async saveInviteCodeMapping(code: string, uuid: string, ttl: number): Promise<void> {
+    // 예: room:code:XYVYFA -> "550e8400-..."
+    await this.client.set(`room:code:${code}`, uuid, 'EX', ttl);
   }
 
   // [추가] 심사위원 목록 저장/조회 메서드

@@ -261,7 +261,13 @@
 //   }
 // }
 
-import { Injectable, Inject, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  NotFoundException,
+  BadRequestException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { CreateRoomDto } from './dto/create-room.dto';
 import { CreateRoomResponseDto } from './dto/create-room.response.dto';
 import { RoomsRepository } from './rooms.repository';
@@ -280,11 +286,13 @@ export class RoomsService {
   ) {}
 
   async createRoom(dto: CreateRoomDto): Promise<CreateRoomResponseDto> {
-    const roomId = generateRoomId();
+    const inviteCode = generateRoomId();
+    const roomUuid = generateUUIDToken();
     const ownerToken = generateUUIDToken();
 
     const room: Room = {
-      roomUuid: roomId,
+      roomUuid: roomUuid,
+      inviteCode: inviteCode,
       ownerUserToken: ownerToken,
       title: dto.title,
       status: 'WAITING', // LOBBY -> WAITING (프론트/백엔드 통일 권장)
@@ -294,9 +302,11 @@ export class RoomsService {
 
     const TTL_SECONDS = 60 * 60 * 12; // 12시간
     await this.roomsRepository.save(room, TTL_SECONDS);
+    await this.roomsRepository.saveInviteCodeMapping(inviteCode, roomUuid, TTL_SECONDS);
 
     return {
-      roomId,
+      roomId: roomUuid, // 👈 클라이언트는 소켓 연결 시 이 UUID를 사용합니다.
+      inviteCode: inviteCode, // 👈 화면에는 이 코드를 보여줍니다.
       token: ownerToken,
     };
   }
@@ -319,7 +329,7 @@ export class RoomsService {
 
     // 2. 재접속 시도 확인
     if (userToken) {
-      const existingUser = await this.roomsRepository.findUserByToken(roomUuid, userToken);
+      const existingUser = await this.roomsRepository.findUserByTokenOrNull(roomUuid, userToken);
       if (existingUser) {
         console.log(`♻️ 재접속 감지: ${nickname} (${userToken})`);
 
@@ -332,7 +342,6 @@ export class RoomsService {
     }
 
     // 3. 인원 수 체크
-
     const currentCount = await this.roomsRepository.getUserCount(roomUuid);
     // config에 따라 최대 인원 계산 (기본값 처리)
     const maxUser = room.config.maxPlayers || 8;
@@ -341,18 +350,25 @@ export class RoomsService {
       throw new BadRequestException('방이 꽉 찼습니다.');
     }
 
-    // ⭐️ 4. 역할(Role) 및 호스트(isHost) 결정 [핵심 변경]
-    const isFirstUser = currentCount === 0;
-    const isHost = isFirstUser; // 첫 입장이면 무조건 호스트
+    // 4. 신규 유저 생성 로직
+    // 방장 토큰과 일치하는지 확인
+    const isOwnerToken = userToken === room.ownerUserToken;
 
-    // 호스트는 자동으로 PLAYER & A팀 0번 슬롯
-    // 게스트는 AUDIENCE(관전) & 팀 없음
-    const role: UserRole = isHost ? 'PLAYER' : 'AUDIENCE';
-    const team: UserTeam = isHost ? 'A' : null;
-    const slotIndex: number | null = isHost ? 0 : null;
+    // 보안 체크: 토큰을 보냈는데 Redis에도 없고 방장 토큰도 아니면 에러 (혹은 무시하고 게스트 처리)
+    if (userToken && !isOwnerToken) {
+      throw new UnauthorizedException('유효하지 않은 유저 토큰입니다.');
+    }
+
+    // 호스트 여부 결정 (토큰이 방장꺼면 호스트)
+    const isHost = isOwnerToken;
+
+    // 입장하면 기본적으로 AUDIENCE(관전) & 팀 없음
+    const role: UserRole = 'AUDIENCE';
+    const team: UserTeam = null;
+    const slotIndex: number | null = null;
 
     // 호스트면 방 생성 때 만든 토큰 사용, 아니면 새로 발급
-    const newUserToken = isHost ? room.ownerUserToken : generateUUIDToken();
+    const newUserToken = isHost ? userToken! : generateUUIDToken();
     const publicUserId = await this.roomsRepository.nextPublicUserId(roomUuid);
 
     // 아바타 랜덤 설정
@@ -747,11 +763,11 @@ export class RoomsService {
     const teamAUsers = users.filter((u) => u.team === 'A');
     const teamBUsers = users.filter((u) => u.team === 'B');
 
-    if (teamAUsers.length !== TEAM_SIZE || teamBUsers.length !== TEAM_SIZE) {
-      throw new BadRequestException(
-        `모든 팀 슬롯이 채워져야 시작할 수 있습니다. (설정: ${TEAM_SIZE}인)`,
-      );
-    }
+    // if (teamAUsers.length !== TEAM_SIZE || teamBUsers.length !== TEAM_SIZE) {
+    //   throw new BadRequestException(
+    //     `모든 팀 슬롯이 채워져야 시작할 수 있습니다. (설정: ${TEAM_SIZE}인)`,
+    //   );
+    // }
 
     // 2. 레디 검증 (전원 레디 체크)
     // 플레이어(팀이 있는 사람)만 체크합니다. 방장은 제외할지 포함할지 결정해야 함.
