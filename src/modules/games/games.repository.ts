@@ -62,4 +62,22 @@ export class GamesRepository {
     const state: GameState = JSON.parse(data);
     return state.aiJudgeIDs || []; // number[] 반환
   }
+
+  /**
+   * 🖼️ [신규] 이미지 ID 리스트 업데이트
+   */
+  async updateGameImages(roomUuid: string, imageIds: number[]): Promise<void> {
+    const key = redisKeys.roomGameState(roomUuid);
+    const data = await this.client.get(key);
+
+    if (!data) {
+      console.warn(`⚠️ [GamesRepo] 게임 상태 없음. 이미지 저장 실패: ${roomUuid}`);
+      return;
+    }
+
+    const state: GameState = JSON.parse(data);
+    state.imageIDs = imageIds; // 필드 업데이트
+
+    await this.client.set(key, JSON.stringify(state), 'KEEPTTL');
+  }
 }

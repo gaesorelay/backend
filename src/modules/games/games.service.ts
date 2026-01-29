@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { GamesRepository } from './games.repository';
 import { GameState } from './types/game-state.type';
+import { GAME_IMAGES } from './images.constant';
 
 @Injectable()
 export class GamesService {
@@ -40,5 +41,31 @@ export class GamesService {
 
   async getJudgeIds(roomUuid: string): Promise<number[]> {
     return this.gamesRepository.getGameJudgeIds(roomUuid);
+  }
+
+  /**
+   * 🎲 [신규] 랜덤 이미지 8개 선정 및 저장
+   */
+  async selectAndSaveImages(roomUuid: string): Promise<number[]> {
+    // 1. 전체 이미지 목록 복사 (원본 보호)
+    const allImages = [...GAME_IMAGES];
+
+    // 2. Fisher-Yates Shuffle (무작위 섞기)
+    for (let i = allImages.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [allImages[i], allImages[j]] = [allImages[j], allImages[i]];
+    }
+
+    // 3. 앞에서 8개 자르기
+    const selectedImages = allImages.slice(0, 8);
+
+    // 4. ID만 추출
+    const imageIds = selectedImages.map((img) => img.id);
+
+    // 5. Repository 호출하여 저장
+    await this.gamesRepository.updateGameImages(roomUuid, imageIds);
+
+    console.log(`🖼️ [Game] 방 ${roomUuid} 이미지 8개 선정 완료: ${imageIds}`);
+    return imageIds;
   }
 }

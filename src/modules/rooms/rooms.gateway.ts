@@ -15,6 +15,7 @@ import { KickUserDto } from './dto/kick-user.dto';
 import { ChatDto } from './dto/chat.dto';
 import { User } from '../users/types/user.type';
 import { AiJudgeService } from '../ai-judges/ai-judges.service';
+import { GamesService } from '../games/games.service';
 
 @WebSocketGateway({
   namespace: 'game',
@@ -30,6 +31,7 @@ export class RoomsGateway {
   constructor(
     private readonly roomsService: RoomsService,
     private readonly aiJudgeService: AiJudgeService,
+    private readonly gamesService: GamesService,
   ) {}
 
   /**
@@ -288,11 +290,15 @@ export class RoomsGateway {
       // Service에서 조건 검증 후 게임 시작 처리
       const { roomUuid } = await this.roomsService.startGame(client.id);
 
+      // 이미지 8개 랜덤 선정 및 저장
+      const imageIds = await this.gamesService.selectAndSaveImages(roomUuid);
+
       // 심사위원 선정
       const judges = await this.aiJudgeService.selectAndSaveJudges(roomUuid);
 
       // 게임 시작 브로드캐스트
       this.server.to(roomUuid).emit('game_started', {
+        imageIds: imageIds,
         judges: judges,
       });
 
@@ -303,6 +309,7 @@ export class RoomsGateway {
       return { status: 'success' };
     } catch (error) {
       // 조건 미충족 등 에러 메시지 반환
+      this.logger.error(`게임 시작 실패: ${error.message}`);
       return { status: 'error', message: error.message };
     }
   }
