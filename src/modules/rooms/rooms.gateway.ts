@@ -10,13 +10,11 @@ import { Logger } from '@nestjs/common';
 import { RoomsService } from './rooms.service';
 import { JoinRoomDto } from './dto/join-room.dto';
 import { LeaveTeamDto } from './dto/leave-team.dto';
-import { RoomConfig } from './types/room.type';
+import { RoomConfig, RoomStatus } from './types/room.type';
 import { KickUserDto } from './dto/kick-user.dto';
 import { ChatDto } from './dto/chat.dto';
 import { User } from '../users/types/user.type';
 import { AiJudgeService } from '../ai-judges/ai-judges.service';
-import { GamesService } from '../games/games.service';
-import { Phase } from '../timer/timer.types';
 
 @WebSocketGateway({
   namespace: 'game',
@@ -32,7 +30,6 @@ export class RoomsGateway {
   constructor(
     private readonly roomsService: RoomsService,
     private readonly aiJudgeService: AiJudgeService,
-    private readonly gamesService: GamesService,
   ) {}
 
   /**
@@ -299,21 +296,9 @@ export class RoomsGateway {
         judges: judges,
       });
 
-      const room = await this.roomsService.getRoomById(roomUuid);
-      const roundMs = room.config.roundTime * 1000;
-      const votingMs = room.config.voteTime * 1000;
-
-      await this.gamesService.startGameFlow(
-        roomUuid,
-        roundMs,
-        votingMs,
-        (phase, durationMs) => {
-          this.emitPhase(roomUuid, phase, durationMs);
-        },
-        async () => {
-          await this.roomsService.updateRoomStatus(roomUuid, 'ENDED');
-        },
-      );
+      await this.roomsService.startGameFlow(roomUuid, (status, durationMs) => {
+        this.emitPhase(roomUuid, status, durationMs);
+      });
 
       return { status: 'success' };
     } catch (error) {
@@ -351,9 +336,9 @@ export class RoomsGateway {
       return { status: 'error', message: error.message };
     }
   }
-  private emitPhase(roomUuid: string, phase: Phase, durationMs: number) {
+  private emitPhase(roomUuid: string, status: RoomStatus, durationMs: number) {
     this.server.to(roomUuid).emit('game_phase_changed', {
-      phase,
+      status,
       startAt: Date.now(),
       durationMs,
     });

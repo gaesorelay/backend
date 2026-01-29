@@ -269,12 +269,14 @@ import { Room, RoomStatus } from './types/room.type';
 import { User, UserRole, UserTeam } from '../users/types/user.type'; // 🚨 types/user.type.ts가 수정되어 있어야 함
 import { generateUUIDToken, generateRoomId } from '../../common/utils/id.util';
 import { GamesService } from '../games/games.service';
+import { TimerService } from '../timer/timer.service';
 
 @Injectable()
 export class RoomsService {
   constructor(
     private readonly roomsRepository: RoomsRepository,
     private readonly gamesService: GamesService,
+    private readonly timerService: TimerService,
   ) {}
 
   async createRoom(dto: CreateRoomDto): Promise<CreateRoomResponseDto> {
@@ -778,11 +780,53 @@ export class RoomsService {
     // GameState 초기화 호출
     await this.gamesService.initGame(roomUuid, sortedTeamA, sortedTeamB);
 
-    // 4. 방 상태 변경
-    room.status = 'PLAYING';
-    await this.roomsRepository.save(room);
-
     return { roomUuid };
+  }
+
+  async startGameFlow(
+    roomUuid: string,
+    emitStatus: (status: RoomStatus, durationMs: number) => void,
+  ) {
+    const room = await this.getRoomById(roomUuid);
+    const animationMs = this.getAnimationDurationMs();
+    const roundMs = room.config.roundTime * 1000;
+    const votingMs = room.config.voteTime * 1000;
+
+    // 1) 카드/AI 배정 애니메이션 단계 알림
+    await this.updateRoomStatus(roomUuid, 'WAITING');
+    emitStatus('WAITING', animationMs);
+
+    // 2) 애니메이션 종료 후 라운드 타이머 시작
+    this.timerService.schedule({ roomUuid, status: 'WAITING', delayMs: animationMs }, () => {
+      void this.startRoundFlow(roomUuid, roundMs, votingMs, emitStatus);
+    });
+  }
+
+  private async startRoundFlow(
+    roomUuid: string,
+    roundMs: number,
+    votingMs: number,
+    emitStatus: (status: RoomStatus, durationMs: number) => void,
+  ) {
+    // 3) 라운드 진행 단계
+    await this.updateRoomStatus(roomUuid, 'PLAYING');
+    emitStatus('PLAYING', roundMs);
+    this.timerService.schedule({ roomUuid, status: 'PLAYING', delayMs: roundMs }, () => {
+      // 4) 투표 단계
+      void this.updateRoomStatus(roomUuid, 'VOTING').then(() => {
+        emitStatus('VOTING', votingMs);
+      });
+      this.timerService.schedule({ roomUuid, status: 'VOTING', delayMs: votingMs }, () => {
+        void this.updateRoomStatus(roomUuid, 'ENDED').then(() => {
+          emitStatus('ENDED', 0);
+        });
+      });
+    });
+  }
+
+  private getAnimationDurationMs() {
+    const fixedMs = 15_000;
+    return fixedMs;
   }
 
   // 배열 섞기 유틸
