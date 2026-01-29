@@ -338,9 +338,17 @@ export class RoomsGateway {
         judges: judges,
       });
 
-      await this.roomsService.startGameFlow(roomUuid, (status, durationMs) => {
-        this.emitPhase(roomUuid, status, durationMs);
-      });
+      // 게임 흐름(대기 -> 라운드 -> 투표 -> 종료)을 시작한다.
+      await this.roomsService.startGameFlow(
+        roomUuid,
+        (status, durationMs) => {
+          this.emitPhase(roomUuid, status, durationMs);
+        },
+        (outcome) => {
+          // 최종 투표 결과는 여기서 브로드캐스트
+          this.server.to(roomUuid).emit('vote_result', outcome);
+        },
+      );
 
       return { status: 'success' };
     } catch (error) {
@@ -349,6 +357,33 @@ export class RoomsGateway {
       return { status: 'error', message: error.message };
     }
   }
+
+  @SubscribeMessage('submit_vote')
+  async handleSubmitVote(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { team: 'A' | 'B' },
+  ) {
+    try {
+      // 관객 투표는 서버 메모리에 누적 저장하고 즉시 브로드캐스트한다.
+      const user = await this.roomsService.getUserBySocket(client.id);
+      const room = await this.roomsService.getRoomById(user.roomUuid);
+      if (room.status !== 'VOTING') {
+        return { status: 'error', message: 'Voting is not open.' };
+      }
+      const outcome = this.gamesService.submitAudienceVote(user.roomUuid, data.team);
+
+      this.server.to(user.roomUuid).emit('vote_updated', {
+        votesTeamA: outcome.votesTeamA,
+        votesTeamB: outcome.votesTeamB,
+      });
+
+      return { status: 'success', data: outcome };
+    } catch (error) {
+      return { status: 'error', message: error.message };
+    }
+  }
+
+  // AI 투표 반영은 VOTING 시작 시점에 내부 로직으로 처리
 
   /**
    * 6. 유저 강퇴 (방장만 가능)
