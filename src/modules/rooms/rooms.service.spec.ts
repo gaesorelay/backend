@@ -757,3 +757,85 @@ describe('RoomsService.kickUser', () => {
     await expect(service.kickUser('socket1', 2)).rejects.toBeInstanceOf(NotFoundException);
   });
 });
+
+describe('RoomsService.leaveRoom', () => {
+  let service: RoomsService;
+  let roomsRepository: {
+    getMappingBySocketId: jest.Mock;
+    findUserByToken: jest.Mock;
+    deleteUser: jest.Mock;
+    getUserCount: jest.Mock;
+    delete: jest.Mock;
+  };
+
+  const roomUuid = 'ROOM123';
+
+  beforeEach(() => {
+    roomsRepository = {
+      getMappingBySocketId: jest.fn(),
+      findUserByToken: jest.fn(),
+      deleteUser: jest.fn(),
+      getUserCount: jest.fn(),
+      delete: jest.fn(),
+    };
+    service = new RoomsService(roomsRepository as unknown as any);
+  });
+
+  it('returns null when mapping is missing', async () => {
+    roomsRepository.getMappingBySocketId.mockResolvedValue(null);
+
+    const result = await service.leaveRoom('socket1');
+
+    expect(result).toBeNull();
+    expect(roomsRepository.findUserByToken).not.toHaveBeenCalled();
+  });
+
+  it('returns null when user is missing', async () => {
+    roomsRepository.getMappingBySocketId.mockResolvedValue({
+      roomUuid,
+      userToken: 'token-user',
+    });
+    roomsRepository.findUserByToken.mockResolvedValue(null);
+
+    const result = await service.leaveRoom('socket1');
+
+    expect(result).toBeNull();
+    expect(roomsRepository.deleteUser).not.toHaveBeenCalled();
+  });
+
+  it('deletes room when last user leaves', async () => {
+    roomsRepository.getMappingBySocketId.mockResolvedValue({
+      roomUuid,
+      userToken: 'token-user',
+    });
+    roomsRepository.findUserByToken.mockResolvedValue({
+      userToken: 'token-user',
+      nickname: 'user',
+    });
+    roomsRepository.getUserCount.mockResolvedValue(0);
+
+    const result = await service.leaveRoom('socket1');
+
+    expect(roomsRepository.deleteUser).toHaveBeenCalledWith(roomUuid, 'token-user', 'socket1');
+    expect(roomsRepository.delete).toHaveBeenCalledWith(roomUuid);
+    expect(result).toEqual({ roomUuid, nickname: 'user' });
+  });
+
+  it('keeps room when users remain', async () => {
+    roomsRepository.getMappingBySocketId.mockResolvedValue({
+      roomUuid,
+      userToken: 'token-user',
+    });
+    roomsRepository.findUserByToken.mockResolvedValue({
+      userToken: 'token-user',
+      nickname: 'user',
+    });
+    roomsRepository.getUserCount.mockResolvedValue(2);
+
+    const result = await service.leaveRoom('socket1');
+
+    expect(roomsRepository.deleteUser).toHaveBeenCalledWith(roomUuid, 'token-user', 'socket1');
+    expect(roomsRepository.delete).not.toHaveBeenCalled();
+    expect(result).toEqual({ roomUuid, nickname: 'user' });
+  });
+});

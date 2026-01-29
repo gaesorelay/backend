@@ -83,7 +83,43 @@ export class RoomsGateway {
   }
 
   /**
-   * 2. 방 정보/유저 목록 요청
+   * 2. 방 퇴장
+   */
+  @SubscribeMessage('leave_room')
+  async handleLeaveRoom(@ConnectedSocket() client: Socket) {
+    this.logger.log(`leave_room 요청: socket ${client.id}`);
+
+    try {
+      const result = await this.roomsService.leaveRoom(client.id);
+      if (!result) {
+        return { status: 'error', message: '유저 정보를 찾을 수 없습니다.' };
+      }
+
+      const { roomUuid, nickname } = result;
+
+      client.leave(roomUuid);
+
+      const users = await this.roomsService.getUsersInRoom(roomUuid);
+
+      this.server.to(roomUuid).emit('lobby_updated', {
+        users: users,
+      });
+
+      this.server.to(roomUuid).emit('chat_message', {
+        nickname: 'SYSTEM',
+        message: `${nickname}님이 퇴장했습니다.`,
+        type: 'system',
+      });
+
+      return { status: 'success' };
+    } catch (error) {
+      this.logger.error(`leave_room failed: ${error.message}`);
+      return { status: 'error', message: error.message };
+    }
+  }
+
+  /**
+   * 3. 방 정보/유저 목록 요청
    */
   @SubscribeMessage('request_room_info')
   async handleRequestRoomInfo(
