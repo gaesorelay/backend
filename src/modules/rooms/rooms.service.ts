@@ -21,13 +21,11 @@ export class RoomsService {
   ) {}
 
   async createRoom(dto: CreateRoomDto): Promise<CreateRoomResponseDto> {
-    const inviteCode = generateRoomId();
-    const roomUuid = generateUUIDToken();
+    const roomUuid = generateRoomId();
     const ownerToken = generateUUIDToken();
 
     const room: Room = {
       roomUuid: roomUuid,
-      inviteCode: inviteCode,
       ownerUserToken: ownerToken,
       title: dto.title,
       status: 'WAITING', // LOBBY -> WAITING (프론트/백엔드 통일 권장)
@@ -37,11 +35,9 @@ export class RoomsService {
 
     const TTL_SECONDS = 60 * 60 * 12; // 12시간
     await this.roomsRepository.save(room, TTL_SECONDS);
-    await this.roomsRepository.saveInviteCodeMapping(inviteCode, roomUuid, TTL_SECONDS);
 
     return {
       roomId: roomUuid, // 👈 클라이언트는 소켓 연결 시 이 UUID를 사용합니다.
-      inviteCode: inviteCode, // 👈 화면에는 이 코드를 보여줍니다.
       token: ownerToken,
     };
   }

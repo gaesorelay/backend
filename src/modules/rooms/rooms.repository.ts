@@ -195,11 +195,6 @@ export class RoomsRepository {
     }
   }
 
-  async saveInviteCodeMapping(code: string, uuid: string, ttl: number): Promise<void> {
-    // 예: room:code:XYVYFA -> "550e8400-..."
-    await this.client.set(`room:code:${code}`, uuid, 'EX', ttl);
-  }
-
   // [추가] 심사위원 목록 저장/조회 메서드
   async saveRoomJudges(roomUuid: string, judgeNames: string[]): Promise<void> {
     const key = `room:${roomUuid}:ai_judge`;

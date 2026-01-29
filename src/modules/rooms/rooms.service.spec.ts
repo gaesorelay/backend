@@ -7,6 +7,7 @@ import * as idUtil from '../../common/utils/id.util';
 // 의존성 주입을 위한 가짜 객체 타입 정의 (any로 처리하여 테스트 복잡도 감소)
 const mockGamesService = {} as any;
 const mockTimerService = {} as any;
+const mockAiJudgeService = {} as any;
 
 describe('RoomsService.joinTeam', () => {
   let service: RoomsService;
@@ -35,6 +36,7 @@ describe('RoomsService.joinTeam', () => {
       roomsRepository as unknown as any,
       mockGamesService,
       mockTimerService,
+      mockAiJudgeService,
     );
   });
 
@@ -224,7 +226,6 @@ describe('RoomsService.joinRoom', () => {
       voteTime: 60,
     },
     createdAt: 0,
-    inviteCode: 'CODE12',
   };
 
   beforeEach(() => {
@@ -245,6 +246,7 @@ describe('RoomsService.joinRoom', () => {
       roomsRepository as unknown as any,
       mockGamesService,
       mockTimerService,
+      mockAiJudgeService,
     );
     jest.spyOn(idUtil, 'generateUUIDToken').mockReturnValue('new-token');
   });
@@ -369,6 +371,7 @@ describe('RoomsService.leaveTeam', () => {
       roomsRepository as unknown as any,
       mockGamesService,
       mockTimerService,
+      mockAiJudgeService,
     );
   });
 
@@ -551,6 +554,7 @@ describe('RoomsService.setUserReady', () => {
       roomsRepository as unknown as any,
       mockGamesService,
       mockTimerService,
+      mockAiJudgeService,
     );
   });
 
@@ -630,6 +634,7 @@ describe('RoomsService.kickUser', () => {
       roomsRepository as unknown as any,
       mockGamesService,
       mockTimerService,
+      mockAiJudgeService,
     );
   });
 
@@ -789,6 +794,7 @@ describe('RoomsService.leaveRoom', () => {
       roomsRepository as unknown as any,
       mockGamesService,
       mockTimerService,
+      mockAiJudgeService,
     );
   });
 

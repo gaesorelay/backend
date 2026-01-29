@@ -132,20 +132,18 @@ export class RoomsGateway {
     try {
       // (1) 방의 상세 정보(제목, 초대코드, 설정) 가져오기
       const room = await this.roomsService.getRoomById(data.roomId);
-      
+
       // (2) 현재 방에 있는 유저 명단 가져오기
       const users = await this.roomsService.getUsersInRoom(data.roomId);
 
       // (3) ⭐️ [핵심] 'room_info'라는 이름으로 "종합 선물세트" 발송
       client.emit('room_info', {
-        roomId: room.roomUuid,       // 긴 UUID (소켓 연결용)
-        inviteCode: room.inviteCode, // ⭐️ 짧은 코드 (화면 표시용)
-        title: room.title,           // ⭐️ 방 제목 (aa 해결용)
-        config: room.config,         // 게임 설정 (타이머 등)
-        status: room.status,         // 대기중/게임중 상태
-        users: users,                // 유저 명단
+        roomId: room.roomUuid, // UUID (소켓 연결용)
+        title: room.title, // ⭐️ 방 제목 (aa 해결용)
+        config: room.config, // 게임 설정 (타이머 등)
+        status: room.status, // 대기중/게임중 상태
+        users: users, // 유저 명단
       });
-
     } catch (error) {
       this.logger.error(`❌ 방 정보 요청 실패: ${error.message}`);
       client.emit('error', { message: '존재하지 않는 방입니다.' });
