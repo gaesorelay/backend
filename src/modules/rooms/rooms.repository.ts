@@ -124,29 +124,17 @@ export class RoomsRepository {
   }
 
   // 👇 [추가] 유저 데이터 삭제 (유저 정보 + 소켓 매핑)
-  async deleteUser(roomUuid: string, userToken: string, socketId: string): Promise<void> {
-    const userKey = redisKeys.roomUser(roomUuid, userToken);
-    const socketKey = redisKeys.socketMap(socketId);
-
-    // 두 키를 동시에 삭제
-    await this.client.del(userKey, socketKey);
-  }
-  /**
-   * 강퇴 등으로 유저를 제거할 때 사용하는 유저 삭제 로직
-   * - socketId가 있을 때만 소켓 매핑까지 함께 삭제
-   */
-  async deleteUserByToken(
-    roomUuid: string,
-    userToken: string,
-    socketId?: string | null,
-  ): Promise<void> {
+  async deleteUser(roomUuid: string, userToken: string, socketId?: string | null): Promise<void> {
     const userKey = redisKeys.roomUser(roomUuid, userToken);
     if (socketId) {
       const socketKey = redisKeys.socketMap(socketId);
+
+      // 유저와 소켓 키를 동시에 삭제
       await this.client.del(userKey, socketKey);
       return;
     }
 
+    // 소켓이 없으면 유저 키만 삭제
     await this.client.del(userKey);
   }
 

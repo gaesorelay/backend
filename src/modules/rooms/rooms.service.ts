@@ -368,7 +368,7 @@ export class RoomsService {
     const slotIndex: number | null = null;
 
     // 호스트면 방 생성 때 만든 토큰 사용, 아니면 새로 발급
-    const newUserToken = isHost ? userToken! : generateUUIDToken();
+    const newUserToken = isHost ? userToken : generateUUIDToken();
     const publicUserId = await this.roomsRepository.nextPublicUserId(roomUuid);
 
     // 아바타 랜덤 설정
@@ -611,7 +611,7 @@ export class RoomsService {
     if (!target) throw new NotFoundException('Target user not found.');
 
     // 4) 대상 유저 데이터/소켓 매핑 삭제
-    await this.roomsRepository.deleteUserByToken(
+    await this.roomsRepository.deleteUser(
       mapping.roomUuid,
       target.userToken,
       target.currentSocketId,

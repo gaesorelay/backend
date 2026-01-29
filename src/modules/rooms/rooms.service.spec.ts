@@ -608,7 +608,7 @@ describe('RoomsService.kickUser', () => {
     findUserByToken: jest.Mock;
     findUserByTokenOrNull: jest.Mock;
     findAllUsersInRoom: jest.Mock;
-    deleteUserByToken: jest.Mock;
+    deleteUser: jest.Mock;
   };
 
   const roomUuid = 'ROOM123';
@@ -619,7 +619,7 @@ describe('RoomsService.kickUser', () => {
       findUserByToken: jest.fn(),
       findUserByTokenOrNull: jest.fn(),
       findAllUsersInRoom: jest.fn(),
-      deleteUserByToken: jest.fn(),
+      deleteUser: jest.fn(),
     };
     // ⭐️ [수정] gamesService, timerService 추가 주입
     service = new RoomsService(
@@ -666,8 +666,8 @@ describe('RoomsService.kickUser', () => {
 
     const result = await service.kickUser('socket1', 2);
 
-    expect(roomsRepository.deleteUserByToken).toHaveBeenCalledTimes(1);
-    expect(roomsRepository.deleteUserByToken).toHaveBeenCalledWith(
+    expect(roomsRepository.deleteUser).toHaveBeenCalledTimes(1);
+    expect(roomsRepository.deleteUser).toHaveBeenCalledWith(
       roomUuid,
       target.userToken,
       target.currentSocketId,
