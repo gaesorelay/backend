@@ -428,17 +428,62 @@ export class RoomsGateway {
       return { status: 'error', message: error.message };
     }
   }
+  // private emitPhase(
+  //   roomUuid: string,
+  //   status: RoomStatus,
+  //   durationMs: number,
+  //   displayStatus?: string,
+  // ) {
+  //   this.server.to(roomUuid).emit('change_phase', {
+  //     status,
+  //     displayStatus: displayStatus ?? status,
+  //     startAt: Date.now(),
+  //     durationMs,
+  //   });
+  // }
   private emitPhase(
     roomUuid: string,
     status: RoomStatus,
     durationMs: number,
     displayStatus?: string,
   ) {
+    // 1. 백엔드에서 날아온 날것의 단어 (WAITING, TURN1 ...)
+    const rawPhase = (displayStatus ?? status).toUpperCase();
+    
+    // 2. 🗣️ [통역기] 프론트엔드용 단어로 변환
+    let frontendPhase = rawPhase; // 기본값
+
+    // (1) WAITING (15초) -> 카드 섞는 애니메이션
+    if (rawPhase === 'WAITING') {
+        frontendPhase = 'CARD_SHUFFLE'; 
+    }
+    
+    // (2) TURN1, TURN2 ... -> 글쓰기 화면 (WRITING)
+    else if (rawPhase.startsWith('TURN')) {
+        frontendPhase = 'WRITING';
+    }
+
+    // (3) VOTING -> 투표 화면
+    else if (rawPhase === 'VOTING') {
+        frontendPhase = 'VOTING';
+    }
+
+    // (4) ENDED -> 최종 결과
+    else if (rawPhase === 'ENDED') {
+        frontendPhase = 'FINAL_RESULT';
+    }
+
+    this.logger.log(`📡 페이즈 통역 전송: "${rawPhase}" -> "${frontendPhase}"`);
+
+    // 3. 변환된 이름으로 전송
     this.server.to(roomUuid).emit('change_phase', {
-      status,
-      displayStatus: displayStatus ?? status,
-      startAt: Date.now(),
-      durationMs,
+      phase: frontendPhase,        // 👈 이제 프론트가 아는 단어('WRITING')가 감!
+      data: {                 
+        duration: durationMs,
+        startAt: Date.now(),
+        serverStatus: status,  
+        roundName: rawPhase,       // 원래 이름(TURN1)은 데이터로 보냄 (몇 번째 턴인지 알 수 있게)
+      },
     });
   }
 }
