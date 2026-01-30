@@ -53,7 +53,8 @@ export class GamesGateway {
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { roomId: string; text: string; team: 'A' | 'B'; userToken: string },
   ) {
-    await this.gamesService.submitStory(data.roomId, data.userToken, data.team, data.text);
+    const cleanMessage = this.gamesService.convertToDogSound(data.text);
+    await this.gamesService.submitStory(data.roomId, data.userToken, data.team, cleanMessage);
 
     // (옵션) 제출 완료되었다고 방에 알림
     this.server.to(data.roomId).emit('story_submitted', { team: data.team });
