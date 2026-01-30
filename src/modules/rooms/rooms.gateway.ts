@@ -198,7 +198,8 @@ export class RoomsGateway {
       // 1. 소켓 ID로 유저 정보 조회 (Service 통해서 사용)
       const user = await this.roomsService.getUserBySocket(client.id);
 
-      // 2. 로그 (선택 사항)
+      // 2. 메시지 욕설 필터링
+      const cleanMessage = this.gamesService.convertToDogSound(data.message);
 
       // 3. 방 전체 브로드캐스트
       this.server.to(user.roomUuid).emit('chat_message', {
@@ -207,7 +208,7 @@ export class RoomsGateway {
         avatarId: user.avatarId, // 아바타 표시용
         team: user.team, // (선택) 팀별 색상 표시 등
         isHost: user.isHost, // (선택) 방장 표시
-        message: data.message,
+        message: cleanMessage,
         timestamp: Date.now(),
       });
     } catch (error) {

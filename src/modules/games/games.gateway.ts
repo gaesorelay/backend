@@ -31,13 +31,13 @@ export class GamesGateway {
   ) {
     // 1. 서비스에 물어보기: "이 사람 지금 써도 되는 사람이야?"
     const isValid = await this.gamesService.validateWriter(data.roomId, data.userToken, data.team);
-
+    const cleanMessage = this.gamesService.convertToDogSound(data.text);
     // 2. 권한이 있는 경우에만 방의 다른 사람들에게 전달
     if (isValid) {
       // 발신자 본인을 제외한 방 안의 모든 유저에게 '실시간 텍스트' 전송
       client.broadcast.to(data.roomId).emit('story_update', {
         team: data.team,
-        text: data.text,
+        text: cleanMessage,
         writerToken: data.userToken, // 누가 쓰고 있는지 프론트가 알 수 있게 포함
       });
     } else {

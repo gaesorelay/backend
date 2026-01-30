@@ -51,11 +51,12 @@ function startTyping() {
     }
 
     const text = messages[index];
+    const cleanMessage = this.gamesService.convertToDogSound(text);
 
     // 서버로 전송 (DB 저장 X, 중계 O)
     userA.emit('story_typing', {
       roomId: ROOM_ID,
-      text: text,
+      text: cleanMessage,
       team: 'A',
       userToken: WRITER_TOKEN, // 권한 있는 토큰
     });

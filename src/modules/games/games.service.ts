@@ -6,6 +6,7 @@ import { EvaluateSubmissionDto } from '../ai-judges/dto/judge.dto';
 import { AiJudgeScore, TeamSide, VoteOutcome } from './types/vote-outcome.type';
 import { Server } from 'socket.io';
 import { WsException } from '@nestjs/websockets';
+import Filter from 'badwords-ko';
 
 @Injectable()
 export class GamesService {
@@ -22,8 +23,24 @@ export class GamesService {
     string,
     { teamA?: EvaluateSubmissionDto; teamB?: EvaluateSubmissionDto }
   >();
+  private filter: Filter;
 
-  constructor(private readonly gamesRepository: GamesRepository) {}
+  private readonly dogSounds = [
+    '개소리!',
+    '멍멍!',
+    '왈왈!',
+    '으르르...',
+    '컹컹!',
+    '깨갱',
+    '끼잉끼잉',
+    '앙!',
+    '캥...',
+    '멍',
+  ];
+
+  constructor(private readonly gamesRepository: GamesRepository) {
+    this.filter = new Filter();
+  }
 
   // Gateway가 생성될 때 Server 인스턴스를 넣어줌 (브로드캐스트용)
   setServer(server: Server) {
@@ -302,5 +319,27 @@ export class GamesService {
     // 원래는 turnIndex를 인자로 받아서 story.length < turnIndex 면 push 하는 게 정확함.
 
     await this.gamesRepository.saveGame(state);
+  }
+
+  /**
+   * 🐕 [핵심] 욕설을 개소리로 변환하는 함수
+   */
+  public convertToDogSound(text: string): string {
+    if (!text) return '';
+
+    // 임시 필터를 하나 만들어서 처리 (또는 생성자에서 설정)
+    const tempFilter = new Filter({ placeHolder: '§' });
+    const masked = tempFilter.clean(text);
+
+    // 2. '§' 가 나올 때마다 랜덤 개소리로 교체합니다.
+    return masked.replace(/§+/g, () => {
+      return this.getRandomDogSound(); // "멍멍!"
+    });
+  }
+
+  // 🎲 랜덤 개소리 뽑기
+  private getRandomDogSound(): string {
+    const index = Math.floor(Math.random() * this.dogSounds.length);
+    return this.dogSounds[index];
   }
 }
