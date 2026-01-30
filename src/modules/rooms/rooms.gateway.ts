@@ -380,8 +380,8 @@ export class RoomsGateway {
       // 관객 투표는 서버 메모리에 누적 저장하고 즉시 브로드캐스트한다.
       const user = await this.roomsService.getUserBySocket(client.id);
       const room = await this.roomsService.getRoomById(user.roomUuid);
-      if (room.status !== 'VOTING') {
-        return { status: 'error', message: 'Voting is not open.' };
+      if (room.status !== 'RESULTING') {
+        return { status: 'error', message: 'Resulting is not open.' };
       }
       const outcome = this.gamesService.submitAudienceVote(user.roomUuid, data.team);
 
@@ -396,7 +396,7 @@ export class RoomsGateway {
     }
   }
 
-  // AI 투표 반영은 VOTING 시작 시점에 내부 로직으로 처리
+  // AI 투표 반영은 RESULTING 시작 시점에 내부 로직으로 처리
 
   /**
    * 6. 유저 강퇴 (방장만 가능)
@@ -427,61 +427,23 @@ export class RoomsGateway {
       return { status: 'error', message: error.message };
     }
   }
-  // private emitPhase(
-  //   roomUuid: string,
-  //   status: RoomStatus,
-  //   durationMs: number,
-  //   displayStatus?: string,
-  // ) {
-  //   this.server.to(roomUuid).emit('change_phase', {
-  //     status,
-  //     displayStatus: displayStatus ?? status,
-  //     startAt: Date.now(),
-  //     durationMs,
-  //   });
-  // }
+
   private emitPhase(
     roomUuid: string,
     status: RoomStatus,
     durationMs: number,
     displayStatus?: string,
   ) {
-    // 1. 백엔드에서 날아온 날것의 단어 (WAITING, TURN1 ...)
-    const rawPhase = (displayStatus ?? status).toUpperCase();
+    const phase = displayStatus ?? status;
+    this.logger.log(`📡 페이즈 전송: "${phase}" (serverStatus: "${status}")`);
 
-    // 2. 🗣️ [통역기] 프론트엔드용 단어로 변환
-    let frontendPhase = rawPhase; // 기본값
-
-    // (1) WAITING (15초) -> 카드 섞는 애니메이션
-    if (rawPhase === 'WAITING') {
-      frontendPhase = 'CARD_SHUFFLE';
-    }
-
-    // (2) TURN1, TURN2 ... -> 글쓰기 화면 (WRITING)
-    else if (rawPhase.startsWith('TURN')) {
-      frontendPhase = 'WRITING';
-    }
-
-    // (3) VOTING -> 투표 화면
-    else if (rawPhase === 'VOTING') {
-      frontendPhase = 'VOTING';
-    }
-
-    // (4) ENDED -> 최종 결과
-    else if (rawPhase === 'ENDED') {
-      frontendPhase = 'FINAL_RESULT';
-    }
-
-    this.logger.log(`📡 페이즈 통역 전송: "${rawPhase}" -> "${frontendPhase}"`);
-
-    // 3. 변환된 이름으로 전송
     this.server.to(roomUuid).emit('change_phase', {
-      phase: frontendPhase, // 👈 이제 프론트가 아는 단어('WRITING')가 감!
+      phase,
       data: {
         duration: durationMs,
         startAt: Date.now(),
         serverStatus: status,
-        roundName: rawPhase, // 원래 이름(TURN1)은 데이터로 보냄 (몇 번째 턴인지 알 수 있게)
+        roundName: phase, // 예: TURN1 등 표시용
       },
     });
   }

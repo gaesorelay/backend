@@ -1,5 +1,5 @@
 ﻿// 1. RoomStatus: 프론트/DB와 통일 (LOBBY 삭제)
-export type RoomStatus = 'WAITING' | 'PLAYING' | 'VOTING' | 'ENDED';
+export type RoomStatus = 'WAITING' | 'PLAYING' | 'RESULTING' | 'ENDED';
 
 // 2. RoomConfig: 프론트엔드 createRoomApi에서 보내는 필드명과 100% 일치시킴
 export interface RoomConfig {

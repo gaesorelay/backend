@@ -99,7 +99,7 @@ export class GamesService {
   }
 
   getEvaluateDto(roomUuid: string, team: TeamSide): EvaluateSubmissionDto | null {
-    // 필요한 시점(VOTING 시작)에 팀별 평가 입력을 조회한다.
+    // 필요한 시점(RESULTING 시작)에 팀별 평가 입력을 조회한다.
     const state = this.evaluateStore.get(roomUuid);
     if (!state) return null;
     return team === 'A' ? (state.teamA ?? null) : (state.teamB ?? null);
