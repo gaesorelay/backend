@@ -49,8 +49,10 @@ export class RoomsGateway {
     this.logger.log(`join_room 요청: 방 ${data.roomId}, 닉네임 ${data.nickname}`);
 
     try {
+      const clientIp = this.getClientIp(client);
       const user: User = await this.roomsService.joinRoom(
         data.roomId,
+        clientIp,
         data.nickname,
         client.id,
         data.avatarId,
@@ -452,5 +454,19 @@ export class RoomsGateway {
         roundName: phase, // 예: TURN1 등 표시용
       },
     });
+  }
+
+  getClientIp(client: Socket): string {
+    const headers = client.handshake.headers;
+    const xForwardedFor = headers['x-forwarded-for'];
+
+    if (xForwardedFor) {
+      // "1.2.3.4, 10.0.0.1" 형태로 들어올 수 있음 -> 첫 번째가 실제 IP
+      const ips = Array.isArray(xForwardedFor) ? xForwardedFor : xForwardedFor.split(',');
+      return ips[0].trim();
+    }
+
+    // 로컬호스트(::1)인 경우 127.0.0.1로 처리 (선택사항)
+    return client.handshake.address === '::1' ? '127.0.0.1' : client.handshake.address;
   }
 }

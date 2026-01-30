@@ -14,4 +14,6 @@ export const redisKeys = {
   roomTimer: (roomUuid: string, phase: string) => `room:${roomUuid}:timer:${phase}`,
 
   roomVote: (roomUuid: string) => `room:${roomUuid}:vote`,
+
+  roomIpban: (roomUuid: string, ip: string) => `ban:room:${roomUuid}:ip:${ip}`,
 };

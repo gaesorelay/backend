@@ -5,6 +5,8 @@ import { redisKeys } from '../../common/constants/redis.keys';
 import { Room } from './types/room.type';
 import { User } from '../users/types/user.type';
 
+const BAN_TTL_SECONDS = 30 * 60; // 30분 (초 단위)
+
 @Injectable()
 export class RoomsRepository {
   constructor(@Inject('REDIS_CLIENT') private readonly client: Redis) {}
@@ -195,17 +197,15 @@ export class RoomsRepository {
     }
   }
 
-  // [추가] 심사위원 목록 저장/조회 메서드
-  async saveRoomJudges(roomUuid: string, judgeNames: string[]): Promise<void> {
-    const key = `room:${roomUuid}:ai_judge`;
-    // 배열을 JSON 문자열로 변환하여 저장
-    await this.client.set(key, JSON.stringify(judgeNames));
+  async addIpBan(roomUuid: string, ip: string): Promise<void> {
+    const key = redisKeys.roomIpban(roomUuid, ip);
+    // 값은 중요하지 않음('1'). 'EX' 옵션으로 1800초 설정
+    await this.client.set(key, '1', 'EX', BAN_TTL_SECONDS);
   }
 
-  async getRoomJudges(roomUuid: string): Promise<string[] | null> {
-    const key = `room:${roomUuid}:ai_judge`;
-    const data = await this.client.get(key);
-    if (!data) return null;
-    return JSON.parse(data);
+  async isIpBanned(roomUuid: string, ip: string): Promise<boolean> {
+    const key = redisKeys.roomIpban(roomUuid, ip);
+    const exists = await this.client.exists(key);
+    return exists === 1; // 1이면 존재(밴 당함), 0이면 없음
   }
 }

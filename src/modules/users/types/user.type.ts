@@ -16,4 +16,5 @@ export interface User {
   slotIndex?: number | null;
   avatarId: number;
   isReady?: boolean;
+  IP?: string;
 }
