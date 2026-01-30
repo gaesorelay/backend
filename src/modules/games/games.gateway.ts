@@ -15,6 +15,15 @@ export class GamesGateway {
 
   constructor(private readonly gamesService: GamesService) {}
 
+  /**
+   * 🚪 게임 소켓 방 입장 처리 (이게 없으면 broadcast 수신 불가!)
+   */
+  @SubscribeMessage('join_game_room')
+  handleJoinGameRoom(@ConnectedSocket() client: Socket, @MessageBody() data: { roomId: string }) {
+    client.join(data.roomId); // 👈 이 한 줄이 핵심입니다!
+    console.log(`🔌 [GamesGateway] 소켓 방 입장: ${client.id} -> ${data.roomId}`);
+  }
+
   @SubscribeMessage('story_typing')
   async handleTyping(
     @ConnectedSocket() client: Socket,
@@ -35,5 +44,18 @@ export class GamesGateway {
       // 권한 없는 유저가 보내면 무시하거나 경고 (선택)
       client.emit('error', { message: '당신의 턴이 아닙니다.' });
     }
+  }
+
+  // 2. ⭐️ [신규] 스토리 제출 (저장은 이때 딱 한 번!)
+  // 유저가 엔터를 치거나, 프론트엔드 타이머가 0초가 됐을 때 이 이벤트를 보냄
+  @SubscribeMessage('submit_story')
+  async handleSubmitStory(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { roomId: string; text: string; team: 'A' | 'B'; userToken: string },
+  ) {
+    await this.gamesService.submitStory(data.roomId, data.userToken, data.team, data.text);
+
+    // (옵션) 제출 완료되었다고 방에 알림
+    this.server.to(data.roomId).emit('story_submitted', { team: data.team });
   }
 }

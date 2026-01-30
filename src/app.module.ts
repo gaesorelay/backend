@@ -8,6 +8,7 @@ import { AiJudgeModule } from './modules/ai-judges/ai-judges.module';
 import configuration from './config/configuration';
 import * as Joi from 'joi';
 import { CoreGateway } from './common/gateways/core.gateway';
+import { GamesModule } from './modules/games/games.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { CoreGateway } from './common/gateways/core.gateway';
     RedisModule,
     RoomsModule,
     AiJudgeModule,
+    GamesModule,
   ],
   controllers: [AppController],
   providers: [AppService, CoreGateway],

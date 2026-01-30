@@ -100,7 +100,8 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
 
     // 라운드 시간은 방 설정값을 사용한다.
     const roundMs = room.config.roundTime * 1000;
-    const totalTurns = room.config.storytellerCount || 1;
+    // const roundMs = 3000;
+    const totalTurns = 8; // 고정값
     this.startTurnFlow(roomUuid, context, 1, totalTurns, roundMs);
   }
 
@@ -110,6 +111,7 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
 
     // 투표 시간은 방 설정값을 사용한다.
     const votingMs = room.config.voteTime * 1000;
+    // const votingMs = 5000;
     context.emitStatus('VOTING', votingMs);
 
     // VOTING 진입 시점에 AI 평가를 병렬로 시작한다.
@@ -150,26 +152,31 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
     this.contexts.delete(roomUuid);
   }
 
-  private startTurnFlow(
+  private async startTurnFlow(
     roomUuid: string,
     context: GameFlowContext,
     turnIndex: number,
     totalTurns: number,
     roundMs: number,
-  ): void {
+  ): Promise<void> {
     // PLAYING 상태는 유지하되, 사용자에게는 TURN 메시지로 안내한다.
     const displayStatus = `TURN${turnIndex}`;
     context.emitStatus('PLAYING', roundMs, displayStatus);
 
-    // 현재 턴 종료 후 다음 턴 또는 VOTING으로 전환
-    this.timerService.schedule({ roomUuid, status: 'PLAYING', delayMs: roundMs }, () => {
+    // 3. 타이머 스케줄링
+    this.timerService.schedule({ roomUuid, status: 'PLAYING', delayMs: roundMs }, async () => {
+      // 4. ⭐️ [추가] 턴 종료 처리 (버퍼 -> 스토리 저장)
+      await this.gamesService.endTurn(roomUuid);
+
+      // 다음 턴인지 투표인지 결정
       if (turnIndex < totalTurns) {
-        this.startTurnFlow(roomUuid, context, turnIndex + 1, totalTurns, roundMs);
-        return;
+        await this.startTurnFlow(roomUuid, context, turnIndex + 1, totalTurns, roundMs);
+      } else {
+        void this.setRoomStatus(roomUuid, 'VOTING');
       }
-      void this.setRoomStatus(roomUuid, 'VOTING');
     });
   }
+
   private async setRoomStatus(roomUuid: string, status: RoomStatus): Promise<void> {
     const room = await this.roomsRepository.findById(roomUuid);
     if (!room) return;
@@ -183,6 +190,7 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
   private getAnimationDurationMs() {
     const fixedMs = 15_000;
     return fixedMs;
+    // return 3000;
   }
 
   private static readonly AI_VOTING_COUNT = 3;

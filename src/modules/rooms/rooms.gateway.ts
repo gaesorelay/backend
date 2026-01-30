@@ -349,9 +349,8 @@ export class RoomsGateway {
         judges: judges,
       });
 
-      // await this.roomsService.startGameFlow(roomUuid, (status, durationMs) => {
-      //   this.emitPhase(roomUuid, status, durationMs);
-      // });
+      // 검증 로직 없이 테스트할때 사용
+      // const roomUuid = data.roomId;
 
       // 4. ⭐️ [수정] 게임 흐름 시작 (이벤트 이름 change_phase로 통일)
       await this.roomsService.startGameFlow(
@@ -449,40 +448,40 @@ export class RoomsGateway {
   ) {
     // 1. 백엔드에서 날아온 날것의 단어 (WAITING, TURN1 ...)
     const rawPhase = (displayStatus ?? status).toUpperCase();
-    
+
     // 2. 🗣️ [통역기] 프론트엔드용 단어로 변환
     let frontendPhase = rawPhase; // 기본값
 
     // (1) WAITING (15초) -> 카드 섞는 애니메이션
     if (rawPhase === 'WAITING') {
-        frontendPhase = 'CARD_SHUFFLE'; 
+      frontendPhase = 'CARD_SHUFFLE';
     }
-    
+
     // (2) TURN1, TURN2 ... -> 글쓰기 화면 (WRITING)
     else if (rawPhase.startsWith('TURN')) {
-        frontendPhase = 'WRITING';
+      frontendPhase = 'WRITING';
     }
 
     // (3) VOTING -> 투표 화면
     else if (rawPhase === 'VOTING') {
-        frontendPhase = 'VOTING';
+      frontendPhase = 'VOTING';
     }
 
     // (4) ENDED -> 최종 결과
     else if (rawPhase === 'ENDED') {
-        frontendPhase = 'FINAL_RESULT';
+      frontendPhase = 'FINAL_RESULT';
     }
 
     this.logger.log(`📡 페이즈 통역 전송: "${rawPhase}" -> "${frontendPhase}"`);
 
     // 3. 변환된 이름으로 전송
     this.server.to(roomUuid).emit('change_phase', {
-      phase: frontendPhase,        // 👈 이제 프론트가 아는 단어('WRITING')가 감!
-      data: {                 
+      phase: frontendPhase, // 👈 이제 프론트가 아는 단어('WRITING')가 감!
+      data: {
         duration: durationMs,
         startAt: Date.now(),
-        serverStatus: status,  
-        roundName: rawPhase,       // 원래 이름(TURN1)은 데이터로 보냄 (몇 번째 턴인지 알 수 있게)
+        serverStatus: status,
+        roundName: rawPhase, // 원래 이름(TURN1)은 데이터로 보냄 (몇 번째 턴인지 알 수 있게)
       },
     });
   }
