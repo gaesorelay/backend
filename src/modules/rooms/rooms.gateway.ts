@@ -16,6 +16,9 @@ import { ChatDto } from './dto/chat.dto';
 import { User } from '../users/types/user.type';
 import { AiJudgeService } from '../ai-judges/ai-judges.service';
 import { GamesService } from '../games/games.service';
+import { UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
+import { WsThrottlerGuard } from '../../common/guards/ws-throttler.guard';
 
 @WebSocketGateway({
   namespace: 'game',
@@ -190,6 +193,8 @@ export class RoomsGateway {
   }
 
   @SubscribeMessage('send_chat')
+  @UseGuards(WsThrottlerGuard)
+  @Throttle({ chat: { limit: 5, ttl: 1000 } })
   async handleChat(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: ChatDto, // DTO 적용

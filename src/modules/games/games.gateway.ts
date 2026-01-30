@@ -7,6 +7,9 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { GamesService } from './games.service';
+import { UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
+import { WsThrottlerGuard } from '../../common/guards/ws-throttler.guard';
 
 @WebSocketGateway({ namespace: 'game', cors: { origin: '*' } })
 export class GamesGateway {
@@ -49,6 +52,8 @@ export class GamesGateway {
   // 2. ⭐️ [신규] 스토리 제출 (저장은 이때 딱 한 번!)
   // 유저가 엔터를 치거나, 프론트엔드 타이머가 0초가 됐을 때 이 이벤트를 보냄
   @SubscribeMessage('submit_story')
+  @UseGuards(WsThrottlerGuard)
+  @Throttle({ chat: { limit: 5, ttl: 1000 } })
   async handleSubmitStory(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { roomId: string; text: string; team: 'A' | 'B'; userToken: string },
