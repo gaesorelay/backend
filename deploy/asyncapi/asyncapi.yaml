@@ -2,7 +2,7 @@ asyncapi: 3.0.0
 info:
   title: 개소릴레이 WebSocket API
   version: 1.2.0
-  description: "개소릴레이 게임 진행을 위한 WebSocket API 명세 (Namespace: /game)"
+  description: '개소릴레이 게임 진행을 위한 WebSocket API 명세 (Namespace: /game)'
 
 servers:
   dev:
@@ -124,16 +124,16 @@ components:
       payload:
         type: object
         properties:
-          roomId: 
+          roomId:
             type: string
             description: 입장할 방의 UUID
-          nickname: 
+          nickname:
             type: string
             description: 사용할 닉네임
-          avatarId: 
+          avatarId:
             type: number
             description: 선택한 아바타 ID
-          userToken: 
+          userToken:
             type: string
             description: 기존 유저 재접속 시 토큰 (선택)
         required: [roomId, nickname, avatarId]
@@ -145,7 +145,7 @@ components:
       payload:
         type: object
         properties:
-          roomId: 
+          roomId:
             type: string
             description: 조회를 원하는 방 UUID
         required: [roomId]
@@ -157,7 +157,7 @@ components:
       payload:
         type: object
         properties:
-          config: 
+          config:
             type: object
             description: 변경할 설정 객체
         required: [config]
@@ -169,11 +169,11 @@ components:
       payload:
         type: object
         properties:
-          isReady: 
+          isReady:
             type: boolean
             description: 준비 여부 (true/false)
         required: [isReady]
-    
+
     SendChat:
       name: send_chat
       title: 채팅 전송
@@ -181,7 +181,7 @@ components:
       payload:
         type: object
         properties:
-          message: 
+          message:
             type: string
             description: 채팅 내용
         required: [message]
@@ -193,13 +193,13 @@ components:
       payload:
         type: object
         properties:
-          public_user_id: 
+          public_user_id:
             type: number
             description: 대상 유저의 공개 ID
-          slot_index: 
+          slot_index:
             type: number
             description: 이동할 슬롯 인덱스 (0~3)
-          team: 
+          team:
             type: string
             enum: [A, B]
             description: 이동할 팀 (A 또는 B)
@@ -212,13 +212,13 @@ components:
       payload:
         type: object
         properties:
-          public_user_id: 
+          public_user_id:
             type: number
             description: 대상 유저의 공개 ID
-          slot_index: 
+          slot_index:
             type: number
             description: 현재 슬롯 인덱스 (참조용)
-          team: 
+          team:
             type: string
             description: 현재 팀 (참조용)
         required: [public_user_id, slot_index, team]
@@ -230,7 +230,7 @@ components:
       payload:
         type: object
         properties:
-          roomId: 
+          roomId:
             type: string
             description: 방 UUID
         required: [roomId]
@@ -242,7 +242,7 @@ components:
       payload:
         type: object
         properties:
-          roomId: 
+          roomId:
             type: string
             description: 방 UUID
         required: [roomId]
@@ -253,7 +253,8 @@ components:
       summary: 유저가 방에서 퇴장할 때 전송합니다.
       payload:
         type: object
-        properties:
+        properties: {}
+        additionalProperties: false
         required: []
 
     StoryTyping:
@@ -285,11 +286,11 @@ components:
       payload:
         type: object
         properties:
-          public_user_id: 
+          public_user_id:
             type: number
             description: 강퇴할 유저의 공개 ID
         required: [public_user_id]
-    
+
     SubmitVote:
       name: submit_vote
       title: 투표 제출
@@ -310,7 +311,7 @@ components:
       payload:
         type: object
         properties:
-          roomId: 
+          roomId:
             type: string
             description: 방 UUID
         required: [roomId]
@@ -343,13 +344,39 @@ components:
       payload:
         type: object
         properties:
-          users: 
+          users:
             type: array
             description: 최신 유저 목록
-          updatedUser: 
+          updatedUser:
             type: object
             description: 변경된 특정 유저 정보 (선택)
 
+    RoomInfo:
+      name: room_info
+      title: 방 정보 응답
+      summary: request_room_info 요청에 대한 ACK 응답을 전달합니다.
+      payload:
+        type: object
+        properties:
+          status:
+            type: string
+            description: 응답 상태 (success/error)
+          data:
+            type: object
+            description: 방 상세 정보 (success 시)
+            properties:
+              roomId: { type: string, description: 방 UUID }
+              title: { type: string, description: 방 제목 }
+              config: { type: object, description: 게임 설정 }
+              status: { type: string, description: 방 상태 }
+              users:
+                type: array
+                description: 유저 목록
+                items:
+                  type: object
+          message:
+            type: string
+            description: 에러 메시지 (error 시)
     ChatMessage:
       name: chat_message
       title: 채팅 수신
