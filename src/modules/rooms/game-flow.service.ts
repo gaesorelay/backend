@@ -148,12 +148,8 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
     // 관객 투표 결과를 기본으로 가져온다.
     let outcome = this.gamesService.getVoteOutcome(roomUuid);
     if (aiScores && aiScores.length > 0) {
-      // AI ?됯? 寃곌낵瑜?媛以묒튂濡?諛섏쁺?쒕떎.
-      outcome = this.gamesService.applyAiJudgeVotes(
-        roomUuid,
-        aiScores,
-        GameFlowService.AI_VOTING_COUNT,
-      );
+      // AI 평가는 투표 수에 반영하지 않고 결과에 첨부한다.
+      outcome = this.gamesService.applyAiJudgeVotes(roomUuid, aiScores);
     }
 
     // 理쒖쥌 寃곌낵瑜?釉뚮줈?쒖틦?ㅽ듃?쒕떎.
@@ -203,8 +199,6 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
     this.roomStatusSubject.notify({ roomUuid, status });
   }
 
-  private static readonly AI_VOTING_COUNT = 3;
-
   private async buildAiJudgeScores(roomUuid: string): Promise<AiJudgeScore[] | null> {
     // 스토리 제출 시 저장된 평가 입력이 없으면 AI 평가는 생략한다.
     const teamAEvaluateDto = this.gamesService.getEvaluateDto(roomUuid, 'A');
@@ -232,6 +226,8 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
 
         return {
           judgeName: aResult.personaName,
+          commentA: aResult.comment,
+          commentB: bResult.comment,
           scoreTeamA: aResult.score,
           scoreTeamB: bResult.score,
         } as AiJudgeScore;
