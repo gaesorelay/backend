@@ -9,7 +9,6 @@ import { GamesService } from '../games/games.service';
 import { VoteOutcome } from '../games/types/vote-outcome.type';
 import { GameFlowService } from './game-flow.service';
 import { RoomStatusSubject } from './room-status.subject';
-import { WsException } from '@nestjs/websockets';
 
 @Injectable()
 export class RoomsService {
@@ -47,7 +46,6 @@ export class RoomsService {
    */
   async joinRoom(
     roomUuid: string,
-    ip: string,
     nickname: string,
     socketId: string,
     avatarId: number,
@@ -57,11 +55,6 @@ export class RoomsService {
     const room = await this.roomsRepository.findById(roomUuid);
     if (!room) {
       throw new NotFoundException('존재하지 않는 방입니다.');
-    }
-
-    const isBanned = await this.roomsRepository.isIpBanned(roomUuid, ip);
-    if (isBanned) {
-      throw new WsException('강퇴당한 방에는 30분간 재입장할 수 없습니다. 🚫');
     }
 
     // 2. 재접속 시도 확인 (DB에 유저 정보가 있는지 체크)
@@ -121,7 +114,6 @@ export class RoomsService {
 
       avatarId: resolvedAvatarId,
       isReady: false,
-      IP: ip,
     };
 
     // 5. Redis 저장
@@ -346,6 +338,10 @@ export class RoomsService {
     const users = await this.roomsRepository.getUsersInRoom(mapping.roomUuid);
     const target = users.find((user) => user.publicUserId === targetPublicUserId);
     if (!target) throw new NotFoundException('Target user not found.');
+
+    if (target.userToken === requester.userToken) {
+      throw new BadRequestException('Host cannot kick themselves.');
+    }
 
     if (target.IP) {
       await this.roomsRepository.addIpBan(mapping.roomUuid, target.IP);
