@@ -18,6 +18,7 @@ describe('RoomsService.joinTeam', () => {
     getUsersInRoom: jest.Mock;
     saveUser: jest.Mock;
     addUserToRoomList: jest.Mock;
+    isIPBannedInRoom: jest.Mock;
   };
 
   const roomUuid = 'ROOM123';
@@ -30,6 +31,7 @@ describe('RoomsService.joinTeam', () => {
       getUsersInRoom: jest.fn(),
       saveUser: jest.fn(),
       addUserToRoomList: jest.fn(),
+      isIPBannedInRoom: jest.fn(),
     };
     // ⭐️ [수정] gamesService, timerService 추가 주입
     service = new RoomsService(
@@ -54,6 +56,7 @@ describe('RoomsService.joinTeam', () => {
       slotIndex: 0,
       avatarId: 1,
       isReady: false,
+      IP: '111.111.111.111',
     };
     const target: User = {
       userToken: 'token-user',
@@ -67,6 +70,7 @@ describe('RoomsService.joinTeam', () => {
       slotIndex: null,
       avatarId: 2,
       isReady: false,
+      IP: '111.111.111.111',
     };
 
     roomsRepository.getMappingBySocketId.mockResolvedValue({
@@ -104,6 +108,7 @@ describe('RoomsService.joinTeam', () => {
       slotIndex: null,
       avatarId: 1,
       isReady: false,
+      IP: '111.111.111.111',
     };
     const target: User = {
       userToken: 'token-user2',
@@ -117,6 +122,7 @@ describe('RoomsService.joinTeam', () => {
       slotIndex: null,
       avatarId: 2,
       isReady: false,
+      IP: '111.111.111.111',
     };
 
     roomsRepository.getMappingBySocketId.mockResolvedValue({
@@ -145,6 +151,7 @@ describe('RoomsService.joinTeam', () => {
       slotIndex: null,
       avatarId: 1,
       isReady: false,
+      IP: '111.111.111.111',
     };
 
     roomsRepository.getMappingBySocketId.mockResolvedValue({
@@ -175,6 +182,7 @@ describe('RoomsService.joinTeam', () => {
       slotIndex: 0,
       avatarId: 1,
       isReady: false,
+      IP: '111.111.111.111',
     };
 
     roomsRepository.getMappingBySocketId.mockResolvedValue({
@@ -210,6 +218,7 @@ describe('RoomsService.joinRoom', () => {
     saveUser: jest.Mock;
     nextPublicUserId: jest.Mock;
     addUserToRoomList: jest.Mock;
+    isIpBanned: jest.Mock;
   };
 
   const roomUuid = 'ROOM123';
@@ -240,6 +249,7 @@ describe('RoomsService.joinRoom', () => {
       saveUser: jest.fn(),
       nextPublicUserId: jest.fn(),
       addUserToRoomList: jest.fn(),
+      isIpBanned: jest.fn(),
     };
     // ⭐️ [수정] gamesService, timerService 추가 주입
     service = new RoomsService(
@@ -269,12 +279,20 @@ describe('RoomsService.joinRoom', () => {
       slotIndex: null,
       avatarId: 1,
       isReady: false,
+      IP: '111.111.111.111',
     };
 
     roomsRepository.findById.mockResolvedValue(room);
     roomsRepository.findUserByTokenOrNull.mockResolvedValue(existingUser);
 
-    const result = await service.joinRoom(roomUuid, 'user', 'new-socket', 1, 'existing-token');
+    const result = await service.joinRoom(
+      roomUuid,
+      '111.111.111.111',
+      'user',
+      'new-socket',
+      1,
+      'existing-token',
+    );
 
     expect(result).toBe(existingUser);
     expect(roomsRepository.updateUserSocket).toHaveBeenCalledWith(
@@ -295,9 +313,9 @@ describe('RoomsService.joinRoom', () => {
   it('throws when room does not exist', async () => {
     roomsRepository.findById.mockResolvedValue(null);
 
-    await expect(service.joinRoom(roomUuid, 'user', 'socket1', 1)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.joinRoom(roomUuid, '111.111.111.111', 'user', 'socket1', 1),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   // 인원이 가득 찼으면 입장 불가
@@ -305,9 +323,9 @@ describe('RoomsService.joinRoom', () => {
     roomsRepository.findById.mockResolvedValue(room);
     roomsRepository.getUserCount.mockResolvedValue(4);
 
-    await expect(service.joinRoom(roomUuid, 'user', 'socket1', 1)).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    await expect(
+      service.joinRoom(roomUuid, '111.111.111.111', 'user', 'socket1', 1),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   // 첫 입장은 HOST로 배정되고 owner 토큰 사용
@@ -316,7 +334,14 @@ describe('RoomsService.joinRoom', () => {
     roomsRepository.getUserCount.mockResolvedValue(0);
     roomsRepository.nextPublicUserId.mockResolvedValue(7);
 
-    const result = await service.joinRoom(roomUuid, 'host', 'socket1', 1, 'owner-token');
+    const result = await service.joinRoom(
+      roomUuid,
+      '111.111.111.111',
+      'host',
+      'socket1',
+      1,
+      'owner-token',
+    );
 
     expect(result.role).toBe('AUDIENCE');
     expect(result.isHost).toBe(true);
@@ -334,7 +359,7 @@ describe('RoomsService.joinRoom', () => {
     roomsRepository.getUserCount.mockResolvedValue(1);
     roomsRepository.nextPublicUserId.mockResolvedValue(8);
 
-    const result = await service.joinRoom(roomUuid, 'user', 'socket1', 1);
+    const result = await service.joinRoom(roomUuid, '111.111.111.111', 'user', 'socket1', 1);
 
     expect(result.role).toBe('AUDIENCE');
     expect(result.isHost).toBe(false);
@@ -354,6 +379,7 @@ describe('RoomsService.leaveTeam', () => {
     findUserByTokenOrNull: jest.Mock;
     getUsersInRoom: jest.Mock;
     saveUser: jest.Mock;
+    isIPBannedInRoom: jest.Mock;
   };
 
   const roomUuid = 'ROOM123';
@@ -365,6 +391,7 @@ describe('RoomsService.leaveTeam', () => {
       findUserByTokenOrNull: jest.fn(),
       getUsersInRoom: jest.fn(),
       saveUser: jest.fn(),
+      isIPBannedInRoom: jest.fn(),
     };
     // ⭐️ [수정] gamesService, timerService 추가 주입
     service = new RoomsService(
