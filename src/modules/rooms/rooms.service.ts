@@ -347,6 +347,10 @@ export class RoomsService {
     const target = users.find((user) => user.publicUserId === targetPublicUserId);
     if (!target) throw new NotFoundException('Target user not found.');
 
+    if (target.userToken === requester.userToken) {
+      throw new BadRequestException('Host cannot kick themselves.');
+    }
+
     if (target.IP) {
       await this.roomsRepository.addIpBan(mapping.roomUuid, target.IP);
     }

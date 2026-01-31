@@ -752,6 +752,31 @@ describe('RoomsService.kickUser', () => {
     await expect(service.kickUser('socket1', 2)).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  it('rejects when host tries to kick self', async () => {
+    const requester: User = {
+      userToken: 'token-host',
+      publicUserId: 1,
+      currentSocketId: 'socket1',
+      roomUuid,
+      nickname: 'host',
+      role: 'PLAYER',
+      isHost: true,
+      team: 'A',
+      slotIndex: 0,
+      avatarId: 1,
+      isReady: false,
+    };
+
+    roomsRepository.getMappingBySocketId.mockResolvedValue({
+      roomUuid,
+      userToken: requester.userToken,
+    });
+    roomsRepository.findUserByToken.mockResolvedValue(requester);
+    roomsRepository.getUsersInRoom.mockResolvedValue([requester]);
+
+    await expect(service.kickUser('socket1', 1)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
   it('throws when mapping is missing', async () => {
     roomsRepository.getMappingBySocketId.mockResolvedValue(null);
 
