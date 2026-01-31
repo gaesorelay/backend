@@ -414,15 +414,24 @@ export class RoomsGateway {
     this.logger.log(`kick_user request: socket ${client.id}, target ${data.public_user_id}`);
 
     try {
-      const { kickedPublicUserId, users, roomUuid } = await this.roomsService.kickUser(
-        client.id,
-        data.public_user_id,
-      );
+      const { kickedPublicUserId, users, roomUuid, kickedSocketId } =
+        await this.roomsService.kickUser(client.id, data.public_user_id);
 
       // 강퇴 이후에도 같은 방의 유저 목록 브로드캐스트
       this.server.to(roomUuid).emit('lobby_updated', {
         users,
       });
+
+      if (kickedSocketId) {
+        this.server.to(kickedSocketId).emit('kicked', {
+          roomUuid,
+          reason: '강퇴되었습니다.',
+        });
+        const kickedSocket = this.server.sockets.sockets.get(kickedSocketId);
+        if (kickedSocket?.connected) {
+          kickedSocket.disconnect(true);
+        }
+      }
 
       return {
         status: 'success',

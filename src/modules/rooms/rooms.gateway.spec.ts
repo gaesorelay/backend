@@ -4,6 +4,7 @@ describe('RoomsGateway.submit_vote', () => {
   const roomsService = {
     getUserBySocket: jest.fn(),
     getRoomById: jest.fn(),
+    kickUser: jest.fn(),
   };
   const gamesService = {
     submitAudienceVote: jest.fn(),
@@ -28,6 +29,9 @@ describe('RoomsGateway.submit_vote', () => {
     // Mock socket.io server
     (gateway as any).server = {
       to: jest.fn().mockReturnValue({ emit: emitSpy }),
+      sockets: {
+        sockets: new Map(),
+      },
     };
 
     roomsService.getUserBySocket.mockResolvedValue({ roomUuid });
@@ -70,5 +74,80 @@ describe('RoomsGateway.submit_vote', () => {
         winner: 'A',
       },
     });
+  });
+});
+
+describe('RoomsGateway.kick_user', () => {
+  const roomsService = {
+    kickUser: jest.fn(),
+  };
+  const gamesService = {};
+  const aiJudgeService = {};
+
+  const socket: any = { id: 'host-socket' };
+  const roomUuid = 'ROOM123';
+
+  let gateway: RoomsGateway;
+  let emitSpy: jest.Mock;
+  let kickedSocketDisconnect: jest.Mock;
+
+  beforeEach(() => {
+    emitSpy = jest.fn();
+    kickedSocketDisconnect = jest.fn();
+
+    gateway = new RoomsGateway(
+      roomsService as unknown as any,
+      aiJudgeService as unknown as any,
+      gamesService as unknown as any,
+    );
+
+    (gateway as any).server = {
+      to: jest.fn().mockReturnValue({ emit: emitSpy }),
+      sockets: {
+        sockets: new Map(),
+      },
+    };
+  });
+
+  it('sends kicked event and disconnects target socket when available', async () => {
+    const kickedSocketId = 'kicked-socket';
+    const kickedSocket = { connected: true, disconnect: kickedSocketDisconnect };
+    (gateway as any).server.sockets.sockets.set(kickedSocketId, kickedSocket);
+
+    roomsService.kickUser.mockResolvedValue({
+      kickedPublicUserId: 2,
+      users: [{ publicUserId: 1 }],
+      roomUuid,
+      kickedSocketId,
+    });
+
+    const result = await gateway.handleKickUser(socket, { public_user_id: 2 });
+
+    expect(roomsService.kickUser).toHaveBeenCalledWith('host-socket', 2);
+    expect((gateway as any).server.to).toHaveBeenCalledWith(roomUuid);
+    expect(emitSpy).toHaveBeenCalledWith('lobby_updated', { users: [{ publicUserId: 1 }] });
+
+    expect((gateway as any).server.to).toHaveBeenCalledWith(kickedSocketId);
+    expect(emitSpy).toHaveBeenCalledWith('kicked', {
+      roomUuid,
+      reason: '강퇴되었습니다.',
+    });
+    expect(kickedSocketDisconnect).toHaveBeenCalledWith(true);
+    expect(result).toEqual({ status: 'success', data: { kickedPublicUserId: 2 } });
+  });
+
+  it('does not emit kicked when kickedSocketId is null', async () => {
+    roomsService.kickUser.mockResolvedValue({
+      kickedPublicUserId: 2,
+      users: [{ publicUserId: 1 }],
+      roomUuid,
+      kickedSocketId: null,
+    });
+
+    const result = await gateway.handleKickUser(socket, { public_user_id: 2 });
+
+    expect((gateway as any).server.to).toHaveBeenCalledWith(roomUuid);
+    expect(emitSpy).toHaveBeenCalledWith('lobby_updated', { users: [{ publicUserId: 1 }] });
+    expect(result).toEqual({ status: 'success', data: { kickedPublicUserId: 2 } });
   });
 });

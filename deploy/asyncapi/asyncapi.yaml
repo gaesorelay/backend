@@ -1,7 +1,7 @@
 asyncapi: 3.0.0
 info:
   title: 개소릴레이 WebSocket API
-  version: 1.2.0
+  version: 1.2.1
   description: '개소릴레이 게임 진행을 위한 WebSocket API 명세 (Namespace: /game)'
 
 servers:
@@ -68,6 +68,8 @@ channels:
         $ref: '#/components/messages/VoteUpdated'
       vote_result:
         $ref: '#/components/messages/VoteResult'
+      kicked:
+        $ref: '#/components/messages/Kicked'
       judging_finished:
         $ref: '#/components/messages/JudgingFinished'
       error:
@@ -109,6 +111,7 @@ operations:
       - $ref: '#/channels/~1/messages/story_update'
       - $ref: '#/channels/~1/messages/vote_updated'
       - $ref: '#/channels/~1/messages/vote_result'
+      - $ref: '#/channels/~1/messages/kicked'
       - $ref: '#/channels/~1/messages/judging_finished'
       - $ref: '#/channels/~1/messages/error'
 
@@ -414,16 +417,29 @@ components:
 
     ChangePhase:
       name: change_phase
-      title: 게임 페이즈 변경
-      summary: 게임 단계(대기, 라운드, 투표 등)가 변경됨을 알립니다.
+      title: "?? ??? ??"
+      summary: "?? ??(??, ???, ?? ?)? ???? ????."
       payload:
         type: object
         properties:
-          status: { type: string, description: 현재 페이즈 (WAITING/PLAYING/VOTING/ENDED) }
-          displayStatus: { type: string, description: 화면 표시용 상태 메시지 }
-          startAt: { type: number, description: 시작 시간 }
-          durationMs: { type: number, description: 지속 시간(ms) }
-
+          phase:
+            type: string
+            description: "?? ?? ?? (displayStatus ?? status)"
+          data:
+            type: object
+            properties:
+              duration:
+                type: number
+                description: "?? ??(ms)"
+              startAt:
+                type: number
+                description: "?? ??"
+              serverStatus:
+                type: string
+                description: "?? ??(WAITING/PLAYING/RESULTING/ENDED)"
+              roundName:
+                type: string
+                description: "?? ?? ??(?: TURN1)"
     StoryUpdate:
       name: story_update
       title: 스토리 업데이트
@@ -459,6 +475,19 @@ components:
           totalScoreB: { type: number, description: AI 점수 포함 총점 B }
           judgeScores: { type: array, description: 심사위원별 점수 상세 }
 
+    Kicked:
+      name: kicked
+      title: "강퇴 알림"
+      summary: "방장에서 강퇴된 사실을 사용자에게 알립니다."
+      payload:
+        type: object
+        properties:
+          roomUuid:
+            type: string
+            description: "방 UUID"
+          reason:
+            type: string
+            description: "강퇴 사유"
     JudgingFinished:
       name: judging_finished
       title: 심사 완료 알림

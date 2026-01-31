@@ -326,7 +326,12 @@ export class RoomsService {
   async kickUser(
     socketId: string,
     targetPublicUserId: number,
-  ): Promise<{ kickedPublicUserId: number; users: User[]; roomUuid: string }> {
+  ): Promise<{
+    kickedPublicUserId: number;
+    users: User[];
+    roomUuid: string;
+    kickedSocketId: string | null;
+  }> {
     // 1) 요청자(방장) 식별
     const mapping = await this.roomsRepository.getMappingBySocketId(socketId);
     if (!mapping) throw new NotFoundException('User not found.');
@@ -355,6 +360,8 @@ export class RoomsService {
       await this.roomsRepository.addIpBan(mapping.roomUuid, target.IP);
     }
 
+    const kickedSocketId = target.currentSocketId ?? null;
+
     // 4) 대상 유저 데이터/소켓 매핑 삭제
     await this.roomsRepository.deleteUser(
       mapping.roomUuid,
@@ -369,6 +376,7 @@ export class RoomsService {
       kickedPublicUserId: targetPublicUserId,
       users: updatedUsers,
       roomUuid: mapping.roomUuid,
+      kickedSocketId,
     };
   }
 
