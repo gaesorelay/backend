@@ -13,10 +13,7 @@ export class GamesService {
   // 관객 투표는 DB가 아니라 서버 메모리에 저장한다.
   // 라운드 종료 시 resetVoteState로 정리한다.
   private server: Server;
-  private readonly voteStore = new Map<
-    string,
-    { votesTeamA: number; votesTeamB: number; aiApplied: boolean }
-  >();
+  private readonly voteStore = new Map<string, { votesTeamA: number; votesTeamB: number }>();
   // AI 평가 입력 DTO도 서버 메모리에 저장한다.
   // 스토리 제출 이벤트에서 setEvaluateDto로 저장해둔다.
   private readonly evaluateStore = new Map<
@@ -135,29 +132,10 @@ export class GamesService {
     return this.toOutcome(roomUuid, state);
   }
 
-  applyAiJudgeVotes(
-    roomUuid: string,
-    aiJudgeScores: AiJudgeScore[],
-    aiVotingCount: number,
-  ): VoteOutcome {
-    // AI 평가 결과는 1회만 반영되도록 aiApplied로 제어한다.
+  applyAiJudgeVotes(roomUuid: string, aiJudgeScores: AiJudgeScore[]): VoteOutcome {
+    // AI 평가는 투표 수에 반영하지 않고 결과에만 첨부한다.
     const state = this.getOrCreateVoteState(roomUuid);
-
-    if (state.aiApplied) {
-      return this.toOutcome(roomUuid, state);
-    }
-
-    for (const judge of aiJudgeScores) {
-      if (judge.scoreTeamA > judge.scoreTeamB) {
-        state.votesTeamA += aiVotingCount;
-      } else if (judge.scoreTeamB > judge.scoreTeamA) {
-        state.votesTeamB += aiVotingCount;
-      }
-      // On tie, no AI votes are added.
-    }
-
-    state.aiApplied = true;
-    return this.toOutcome(roomUuid, state);
+    return { ...this.toOutcome(roomUuid, state), aiJudges: aiJudgeScores };
   }
 
   getVoteOutcome(roomUuid: string): VoteOutcome {
@@ -173,7 +151,7 @@ export class GamesService {
     const existing = this.voteStore.get(roomUuid);
     if (existing) return existing;
 
-    const initial = { votesTeamA: 0, votesTeamB: 0, aiApplied: false };
+    const initial = { votesTeamA: 0, votesTeamB: 0 };
     this.voteStore.set(roomUuid, initial);
     return initial;
   }

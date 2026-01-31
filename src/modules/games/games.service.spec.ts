@@ -33,38 +33,52 @@ describe('GamesService voting', () => {
     service.submitAudienceVote(roomUuid, 'A');
 
     const aiScores: AiJudgeScore[] = [
-      { judgeName: 'J1', scoreTeamA: 70, scoreTeamB: 60 },
-      { judgeName: 'J2', scoreTeamA: 40, scoreTeamB: 80 },
-      { judgeName: 'J3', scoreTeamA: 90, scoreTeamB: 30 },
+      {
+        judgeName: 'J1',
+        commentA: 'A good',
+        commentB: 'B ok',
+        scoreTeamA: 70,
+        scoreTeamB: 60,
+      },
+      {
+        judgeName: 'J2',
+        commentA: 'A ok',
+        commentB: 'B good',
+        scoreTeamA: 40,
+        scoreTeamB: 80,
+      },
+      {
+        judgeName: 'J3',
+        commentA: 'A best',
+        commentB: 'B weak',
+        scoreTeamA: 90,
+        scoreTeamB: 30,
+      },
     ];
 
-    const outcome = service.applyAiJudgeVotes(roomUuid, aiScores, 2);
+    const outcome = service.applyAiJudgeVotes(roomUuid, aiScores);
 
-    // J1, J3 -> Team A +2 each, J2 -> Team B +2
-    expect(outcome.votesTeamA).toBe(1 + 4);
-    expect(outcome.votesTeamB).toBe(2);
-    expect(outcome.winner).toBe('A');
-  });
-
-  it('does not apply AI votes twice', () => {
-    // AI 투표가 한 번만 반영되는지 확인
-    const aiScores: AiJudgeScore[] = [{ judgeName: 'J1', scoreTeamA: 70, scoreTeamB: 60 }];
-
-    const first = service.applyAiJudgeVotes(roomUuid, aiScores, 3);
-    const second = service.applyAiJudgeVotes(roomUuid, aiScores, 3);
-
-    expect(first.votesTeamA).toBe(3);
-    expect(second.votesTeamA).toBe(3);
-  });
-
-  it('skips AI votes on tie', () => {
-    // 동점인 경우 AI 투표가 반영되지 않는지 확인
-    const aiScores: AiJudgeScore[] = [{ judgeName: 'J1', scoreTeamA: 50, scoreTeamB: 50 }];
-
-    const outcome = service.applyAiJudgeVotes(roomUuid, aiScores, 5);
-
-    expect(outcome.votesTeamA).toBe(0);
+    expect(outcome.votesTeamA).toBe(1);
     expect(outcome.votesTeamB).toBe(0);
-    expect(outcome.winner).toBe('DRAW');
+    expect(outcome.winner).toBe('A');
+    expect(outcome.aiJudges).toEqual(aiScores);
+  });
+
+  it('does not mutate votes when AI scores are attached multiple times', () => {
+    const aiScores: AiJudgeScore[] = [
+      {
+        judgeName: 'J1',
+        commentA: 'Tie A',
+        commentB: 'Tie B',
+        scoreTeamA: 50,
+        scoreTeamB: 50,
+      },
+    ];
+
+    const first = service.applyAiJudgeVotes(roomUuid, aiScores);
+    const second = service.applyAiJudgeVotes(roomUuid, aiScores);
+
+    expect(first.votesTeamA).toBe(0);
+    expect(second.votesTeamA).toBe(0);
   });
 });
