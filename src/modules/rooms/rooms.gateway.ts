@@ -4,6 +4,7 @@
   SubscribeMessage,
   MessageBody,
   ConnectedSocket,
+  WsException,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
@@ -251,31 +252,26 @@ export class RoomsGateway {
     }
   }
 
-  // rooms.gateway.ts
-@SubscribeMessage('submit_story')
-async handleSubmitStory(@ConnectedSocket() client: Socket, @MessageBody() data: any) {
-  try {
+  @SubscribeMessage('submit_story')
+  @UseGuards(WsThrottlerGuard)
+  @Throttle({ chat: { limit: 5, ttl: 1000 } })
+  async handleSubmitStory(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { text: string; team: 'A' | 'B'; userToken: string },
+  ) {
     const user = await this.roomsService.getUserBySocket(client.id);
-    if (!user) {
-      console.error(`❌ 유저를 찾을 수 없음! 소켓ID: ${client.id}`); // 이게 찍히면 100% 원인
-      return;
-    }
+    if (!user) throw new WsException('유저 세션 없음');
 
-    const cleanMessage = this.gamesService.convertToDogSound(data.text);
-    
-    // 이벤트를 쏠 때 방 ID가 유효한지 확인
+    const clean = this.gamesService.convertToDogSound(data.text);
+
+    await this.gamesService.submitStory(user.roomUuid, data.userToken, data.team, clean);
+
     this.server.to(user.roomUuid).emit('story_submitted', {
       team: data.team,
       writerToken: data.userToken,
-      text: cleanMessage,
+      text: clean,
     });
-    
-  
-  } catch (e) {
-    console.error("🔥 서버 에러:", e);
   }
-}
-
 
   @SubscribeMessage('join_team')
   async handleJoinTeam(
