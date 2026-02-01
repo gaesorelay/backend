@@ -334,7 +334,10 @@ components:
           userToken:
             type: string
             description: 유저 토큰
-        required: [roomId, text, team, userToken]
+          turn:
+            type: number
+            description: 제출하는 턴 번호 (1-based)
+        required: [roomId, text, team, userToken, turn]
 
     KickUser:
       name: kick_user

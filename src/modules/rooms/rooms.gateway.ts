@@ -259,14 +259,14 @@ export class RoomsGateway {
   @Throttle({ chat: { limit: 5, ttl: 1000 } })
   async handleSubmitStory(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { text: string; team: 'A' | 'B'; userToken: string },
+    @MessageBody() data: { text: string; team: 'A' | 'B'; userToken: string; turn: number },
   ) {
     try {
       const user = await this.roomsService.getUserBySocket(client.id);
       if (!user) throw new WsException('유저 세션 없음');
 
       const clean = this.gamesService.convertToDogSound(data.text);
-      await this.gamesService.submitStory(user.roomUuid, data.userToken, data.team, clean);
+      await this.gamesService.submitStory(user.roomUuid, data.userToken, data.team, clean, data.turn);
 
       this.server.to(user.roomUuid).emit('story_submitted', {
         team: data.team,

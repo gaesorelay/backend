@@ -5,7 +5,6 @@ import { GAME_IMAGES } from './images.constant';
 import { EvaluateSubmissionDto } from '../ai-judges/dto/judge.dto';
 import { AiJudgeScore, TeamSide, VoteOutcome } from './types/vote-outcome.type';
 import { Server } from 'socket.io';
-import { WsException } from '@nestjs/websockets';
 import Filter from 'badwords-ko';
 
 @Injectable()
@@ -233,36 +232,29 @@ export class GamesService {
 
   /**
    * 📝 [제출] 유저가 작성을 완료해서 보냄
+   * - turn: 클라이언트가 명시한 턴 (1-based)
    */
-  async submitStory(roomUuid: string, userToken: string, team: 'A' | 'B', text: string) {
+  async submitStory(roomUuid: string, userToken: string, team: 'A' | 'B', text: string, turn: number) {
     const state = await this.gamesRepository.getGame(roomUuid);
     if (!state) return;
 
     const storyList = team === 'A' ? state.teamAStory : state.teamBStory;
 
-    // 1. 권한 검증 삭제 (요청사항: 무조건 쓰기)
-    // "이번 턴에 대한 스토리"를 저장해야 함.
-    // startTurn에서 업데이트한 currentRound를 신뢰.
+    // 클라이언트가 보낸 턴을 믿고 해당 인덱스에 저장
+    // 1-based -> 0-based
+    const targetIndex = turn - 1;
 
-    const targetIndex = (state.currentRound || 1) - 1;
+    // 간단한 유효성 검사 (음수 방지)
+    if (targetIndex < 0) return;
 
-    // 2. 덮어쓰기 vs 추가 로직
-    // 보통 storyList.length == targetIndex 여야 함 (이전 턴까지 완료됨)
-    // 만약 length > targetIndex 면 이미 이번 턴(또는 미래?) 스토리가 있는 것 -> Overwrite
-    // 만약 length == targetIndex 면 -> Push
-    // 만약 length < targetIndex 면? -> 이전 턴이 비어있음 (Skip 등으로). 
-    // -> 이 경우 중간을 비우고 넣을 순 없으니(배열이므로), 빈 문자열 채우거나 그냥 Push.
-    // -> 여기서는 편의상 "그냥 Push" (순서 밀릴 수 있지만, endTurn이 보정해주길 기대)
-
-    if (storyList.length > targetIndex) {
-      // 이미 존재하면 덮어쓰기
-      storyList[targetIndex] = text;
-      console.log(`[SubmitStory] Overwrite round ${state.currentRound}: ${text}`);
+    // 배열 구멍이 생길 수 있지만, 요청대로 "해당 턴"에 꽂아넣음
+    if (storyList[targetIndex]) {
+       console.log(`[SubmitStory] Overwrite turn ${turn}: ${text}`);
     } else {
-      // 없으면 추가
-      storyList.push(text);
-      console.log(`[SubmitStory] New submission (Round ${state.currentRound}): ${text}`);
+       console.log(`[SubmitStory] New submission turn ${turn}: ${text}`);
     }
+    
+    storyList[targetIndex] = text;
 
     // 3. 변경사항 저장
     await this.gamesRepository.saveGame(state);
