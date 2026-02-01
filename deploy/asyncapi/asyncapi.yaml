@@ -229,7 +229,7 @@ components:
     AutoFill:
       name: auto_fill
       title: 자동 채우기 (방장)
-      summary: 빈 슬롯을 관전자로 무작위 채웁니다.
+      summary: 빈 슬롯을 관전자로 무작위 채웁니다. (관객이 부족할 경우 가능한 인원만큼만 채웁니다)
       payload:
         type: object
         properties:
