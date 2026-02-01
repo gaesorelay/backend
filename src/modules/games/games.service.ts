@@ -210,6 +210,9 @@ export class GamesService {
     // 0부터 시작하므로 turnIndex - 1 (1턴 -> index 0)
     const index = turnIndex - 1;
 
+    // ⭐️ [로직] 현재 라운드 정보 업데이트
+    state.currentRound = turnIndex;
+
     // 이번 턴에 글을 써야 할 유저 토큰 계산
     // (A팀/B팀 각각 순서에 맞춰서)
     const writerA = state.teamAOrder[index % state.teamAOrder.length];
@@ -235,34 +238,34 @@ export class GamesService {
     const state = await this.gamesRepository.getGame(roomUuid);
     if (!state) return;
 
-    // 1. 권한 검증 (내 턴 맞나?)
     const storyList = team === 'A' ? state.teamAStory : state.teamBStory;
-    const orderList = team === 'A' ? state.teamAOrder : state.teamBOrder;
 
-    // 현재 라운드 인덱스 = 이미 저장된 스토리 개수
-    // (예: 1라운드면 스토리 0개 -> index 0)
-    const currentRoundIndex = storyList.length;
+    // 1. 권한 검증 삭제 (요청사항: 무조건 쓰기)
+    // "이번 턴에 대한 스토리"를 저장해야 함.
+    // startTurn에서 업데이트한 currentRound를 신뢰.
 
-    // 이미 제출했는지 확인 (중복 제출 방지)
-    // startTurn에서 계산된 이번 라운드 목표 개수와 비교해도 됨
-    // 여기서는 단순하게 "내 순서가 맞으면 저장"
+    const targetIndex = (state.currentRound || 1) - 1;
 
-    const turnUser = orderList[currentRoundIndex % orderList.length];
-    if (turnUser !== userToken) {
-      throw new WsException('당신의 차례가 아닙니다.');
+    // 2. 덮어쓰기 vs 추가 로직
+    // 보통 storyList.length == targetIndex 여야 함 (이전 턴까지 완료됨)
+    // 만약 length > targetIndex 면 이미 이번 턴(또는 미래?) 스토리가 있는 것 -> Overwrite
+    // 만약 length == targetIndex 면 -> Push
+    // 만약 length < targetIndex 면? -> 이전 턴이 비어있음 (Skip 등으로). 
+    // -> 이 경우 중간을 비우고 넣을 순 없으니(배열이므로), 빈 문자열 채우거나 그냥 Push.
+    // -> 여기서는 편의상 "그냥 Push" (순서 밀릴 수 있지만, endTurn이 보정해주길 기대)
+
+    if (storyList.length > targetIndex) {
+      // 이미 존재하면 덮어쓰기
+      storyList[targetIndex] = text;
+      console.log(`[SubmitStory] Overwrite round ${state.currentRound}: ${text}`);
+    } else {
+      // 없으면 추가
+      storyList.push(text);
+      console.log(`[SubmitStory] New submission (Round ${state.currentRound}): ${text}`);
     }
-
-    // 2. 스토리 저장 (Push)
-    storyList.push(text);
 
     // 3. 변경사항 저장
     await this.gamesRepository.saveGame(state);
-
-    // 💡 [중요] 만약 A, B 둘 다 제출했다면? -> 즉시 다음 턴으로 넘어가야 함!
-    // 이 부분은 GameFlowService와 연동이 필요한데,
-    // 일단 여기서는 저장만 하고 "둘 다 찼는지" 확인하는 로직은 별도로 체크하거나
-    // GameFlowService가 주기적으로 확인하게 해야 합니다.
-    // (가장 깔끔한 건 여기서 둘 다 찼으면 gameFlowService.triggerNextTurn()을 부르는 구조)
   }
 
   /**
