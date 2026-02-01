@@ -31,19 +31,29 @@ channels:
       leave_team:
         $ref: '#/components/messages/LeaveTeam'
       auto_fill:
-        $ref: '#/components/messages/AutoFill'
+        - $ref: "#/components/messages/AutoFill"
+        - $ref: "#/components/messages/SkipPhase"
+        - $ref: "#/components/messages/PrevPhase"
+      x-response:
+        $ref: "#/components/messages/FunctionAcknowledgement"
       start_game:
         $ref: '#/components/messages/StartGame'
       leave_room:
         $ref: '#/components/messages/LeaveRoom'
       story_typing:
         $ref: '#/components/messages/StoryTyping'
+      submit_story:
+        $ref: '#/components/messages/SubmitStory'
+        x-response:
+          $ref: '#/components/messages/FunctionAcknowledgement'
       kick_user:
         $ref: '#/components/messages/KickUser'
       submit_vote:
         $ref: '#/components/messages/SubmitVote'
       request_judging:
         $ref: '#/components/messages/RequestJudging'
+      skip_phase:
+        $ref: '#/components/messages/SkipPhase'
 
       # Server -> Client Messages
       user_joined: # Legacy support
@@ -92,9 +102,11 @@ operations:
       - $ref: '#/channels/~1/messages/start_game'
       - $ref: '#/channels/~1/messages/leave_room'
       - $ref: '#/channels/~1/messages/story_typing'
+      - $ref: '#/channels/~1/messages/submit_story'
       - $ref: '#/channels/~1/messages/kick_user'
       - $ref: '#/channels/~1/messages/submit_vote'
       - $ref: '#/channels/~1/messages/request_judging'
+      - $ref: '#/channels/~1/messages/skip_phase'
 
   sendServerEvents:
     action: send
@@ -140,6 +152,26 @@ components:
             type: string
             description: 기존 유저 재접속 시 토큰 (선택)
         required: [roomId, nickname, avatarId]
+
+    SkipPhase:
+      name: skip_phase
+      title: 단계 건너뛰기
+      summary: 현재 진행 중인 게임 단계를 강제로 건너뛰고 다음 로직을 실행합니다. (테스트용)
+      payload:
+        type: object
+        properties: {}
+        additionalProperties: false
+        required: []
+
+    PrevPhase:
+      name: prev_phase
+      title: 이전 단계로 되돌리기
+      summary: 현재 진행 중인 게임 단계를 취소하고 이전 단계로 되돌립니다. 데이터도 롤백됩니다. (테스트용)
+      payload:
+        type: object
+        properties: {}
+        additionalProperties: false
+        required: []
 
     RequestRoomInfo:
       name: request_room_info
@@ -281,6 +313,31 @@ components:
             type: string
             description: 유저 토큰
         required: [roomId, text, team, userToken]
+
+    SubmitStory:
+      name: submit_story
+      title: 스토리 제출
+      summary: 플레이어가 작성한 스토리를 제출합니다. (제출 성공/실패 응답 있음)
+      payload:
+        type: object
+        properties:
+          roomId:
+            type: string
+            description: 방 UUID
+          text:
+            type: string
+            description: 제출할 스토리 텍스트
+          team:
+            type: string
+            enum: [A, B]
+            description: 팀 정보
+          userToken:
+            type: string
+            description: 유저 토큰
+          turn:
+            type: number
+            description: 제출하는 턴 번호 (1-based)
+        required: [roomId, text, team, userToken, turn]
 
     KickUser:
       name: kick_user
