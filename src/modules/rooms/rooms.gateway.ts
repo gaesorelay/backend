@@ -4,6 +4,7 @@
   SubscribeMessage,
   MessageBody,
   ConnectedSocket,
+  WsException,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
@@ -19,6 +20,7 @@ import { GamesService } from '../games/games.service';
 import { UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { WsThrottlerGuard } from '../../common/guards/ws-throttler.guard';
+import { GameFlowService } from './game-flow.service';
 
 @WebSocketGateway({
   namespace: 'game',
@@ -35,6 +37,7 @@ export class RoomsGateway {
     private readonly roomsService: RoomsService,
     private readonly aiJudgeService: AiJudgeService,
     private readonly gamesService: GamesService,
+    private readonly gameFlowService: GameFlowService,
   ) {}
 
   /**
@@ -251,31 +254,31 @@ export class RoomsGateway {
     }
   }
 
-  // rooms.gateway.ts
-@SubscribeMessage('submit_story')
-async handleSubmitStory(@ConnectedSocket() client: Socket, @MessageBody() data: any) {
-  try {
-    const user = await this.roomsService.getUserBySocket(client.id);
-    if (!user) {
-      console.error(`❌ 유저를 찾을 수 없음! 소켓ID: ${client.id}`); // 이게 찍히면 100% 원인
-      return;
+  @SubscribeMessage('submit_story')
+  @UseGuards(WsThrottlerGuard)
+  @Throttle({ chat: { limit: 5, ttl: 1000 } })
+  async handleSubmitStory(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { text: string; team: 'A' | 'B'; userToken: string; turn: number },
+  ) {
+    try {
+      const user = await this.roomsService.getUserBySocket(client.id);
+      if (!user) throw new WsException('유저 세션 없음');
+
+      const clean = this.gamesService.convertToDogSound(data.text);
+      await this.gamesService.submitStory(user.roomUuid, data.userToken, data.team, clean, data.turn);
+
+      this.server.to(user.roomUuid).emit('story_submitted', {
+        team: data.team,
+        writerToken: data.userToken,
+        text: clean,
+      });
+
+      return { status: 'success' };
+    } catch (error) {
+      return { status: 'error', message: error.message };
     }
-
-    const cleanMessage = this.gamesService.convertToDogSound(data.text);
-    
-    // 이벤트를 쏠 때 방 ID가 유효한지 확인
-    this.server.to(user.roomUuid).emit('story_submitted', {
-      team: data.team,
-      writerToken: data.userToken,
-      text: cleanMessage,
-    });
-    
-  
-  } catch (e) {
-    console.error("🔥 서버 에러:", e);
   }
-}
-
 
   @SubscribeMessage('join_team')
   async handleJoinTeam(
@@ -379,6 +382,36 @@ async handleSubmitStory(@ConnectedSocket() client: Socket, @MessageBody() data: 
         users: updatedUsers,
       });
 
+      return { status: 'success' };
+    } catch (error) {
+      return { status: 'error', message: error.message };
+    }
+  }
+
+  /**
+   * 강제 단계 넘기기
+   */
+  @SubscribeMessage('skip_phase')
+  async handleSkipPhase(@ConnectedSocket() client: Socket) {
+    this.logger.log(`skip_phase 요청: ${client.id}`);
+    try {
+      const user = await this.roomsService.getUserBySocket(client.id);
+      await this.gameFlowService.skipPhase(user.roomUuid);
+      return { status: 'success' };
+    } catch (error) {
+      return { status: 'error', message: error.message };
+    }
+  }
+
+  /**
+   * ⏪ [테스트용] 이전 단계로 돌아가기
+   */
+  @SubscribeMessage('prev_phase')
+  async handlePrevPhase(@ConnectedSocket() client: Socket) {
+    this.logger.log(`prev_phase 요청: ${client.id}`);
+    try {
+      const user = await this.roomsService.getUserBySocket(client.id);
+      await this.gameFlowService.prevPhase(user.roomUuid);
       return { status: 'success' };
     } catch (error) {
       return { status: 'error', message: error.message };

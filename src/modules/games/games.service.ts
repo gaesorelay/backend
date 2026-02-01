@@ -5,7 +5,6 @@ import { GAME_IMAGES } from './images.constant';
 import { EvaluateSubmissionDto } from '../ai-judges/dto/judge.dto';
 import { AiJudgeScore, TeamSide, VoteOutcome } from './types/vote-outcome.type';
 import { Server } from 'socket.io';
-import { WsException } from '@nestjs/websockets';
 import Filter from 'badwords-ko';
 
 @Injectable()
@@ -210,6 +209,9 @@ export class GamesService {
     // 0부터 시작하므로 turnIndex - 1 (1턴 -> index 0)
     const index = turnIndex - 1;
 
+    // ⭐️ [로직] 현재 라운드 정보 업데이트
+    state.currentRound = turnIndex;
+
     // 이번 턴에 글을 써야 할 유저 토큰 계산
     // (A팀/B팀 각각 순서에 맞춰서)
     const writerA = state.teamAOrder[index % state.teamAOrder.length];
@@ -230,39 +232,32 @@ export class GamesService {
 
   /**
    * 📝 [제출] 유저가 작성을 완료해서 보냄
+   * - turn: 클라이언트가 명시한 턴 (1-based)
    */
-  async submitStory(roomUuid: string, userToken: string, team: 'A' | 'B', text: string) {
+  async submitStory(roomUuid: string, userToken: string, team: 'A' | 'B', text: string, turn: number) {
     const state = await this.gamesRepository.getGame(roomUuid);
     if (!state) return;
 
-    // 1. 권한 검증 (내 턴 맞나?)
     const storyList = team === 'A' ? state.teamAStory : state.teamBStory;
-    const orderList = team === 'A' ? state.teamAOrder : state.teamBOrder;
 
-    // 현재 라운드 인덱스 = 이미 저장된 스토리 개수
-    // (예: 1라운드면 스토리 0개 -> index 0)
-    const currentRoundIndex = storyList.length;
+    // 클라이언트가 보낸 턴을 믿고 해당 인덱스에 저장
+    // 1-based -> 0-based
+    const targetIndex = turn - 1;
 
-    // 이미 제출했는지 확인 (중복 제출 방지)
-    // startTurn에서 계산된 이번 라운드 목표 개수와 비교해도 됨
-    // 여기서는 단순하게 "내 순서가 맞으면 저장"
+    // 간단한 유효성 검사 (음수 방지)
+    if (targetIndex < 0) return;
 
-    const turnUser = orderList[currentRoundIndex % orderList.length];
-    if (turnUser !== userToken) {
-      throw new WsException('당신의 차례가 아닙니다.');
+    // 배열 구멍이 생길 수 있지만, 요청대로 "해당 턴"에 꽂아넣음
+    if (storyList[targetIndex]) {
+       console.log(`[SubmitStory] Overwrite turn ${turn}: ${text}`);
+    } else {
+       console.log(`[SubmitStory] New submission turn ${turn}: ${text}`);
     }
-
-    // 2. 스토리 저장 (Push)
-    storyList.push(text);
+    
+    storyList[targetIndex] = text;
 
     // 3. 변경사항 저장
     await this.gamesRepository.saveGame(state);
-
-    // 💡 [중요] 만약 A, B 둘 다 제출했다면? -> 즉시 다음 턴으로 넘어가야 함!
-    // 이 부분은 GameFlowService와 연동이 필요한데,
-    // 일단 여기서는 저장만 하고 "둘 다 찼는지" 확인하는 로직은 별도로 체크하거나
-    // GameFlowService가 주기적으로 확인하게 해야 합니다.
-    // (가장 깔끔한 건 여기서 둘 다 찼으면 gameFlowService.triggerNextTurn()을 부르는 구조)
   }
 
   /**
@@ -295,6 +290,28 @@ export class GamesService {
 
     // 만약 둘 다 안 냈을 수도 있으니,
     // 원래는 turnIndex를 인자로 받아서 story.length < turnIndex 면 push 하는 게 정확함.
+
+    await this.gamesRepository.saveGame(state);
+  }
+
+  /**
+   * ⏪ [롤백] 스토리를 특정 라운드까지만 남기고 자른다.
+   * targetRoundIndex: 되돌아갈 라운드 번호 (예: 2턴으로 돌아가려면 -> 1 (0, 1 인덱스만 남김))
+   * 즉, targetRoundIndex 길이만큼만 남기고 나머지는 버림
+   */
+  async rollbackStory(roomUuid: string, targetRoundIndex: number) {
+    const state = await this.gamesRepository.getGame(roomUuid);
+    if (!state) return;
+
+    // 길이 조정 (splice는 원본 배열 수정)
+    // 인자가 (start, deleteCount) 이므로
+    // targetRoundIndex부터 끝까지 삭제
+    if (state.teamAStory.length > targetRoundIndex) {
+      state.teamAStory.splice(targetRoundIndex);
+    }
+    if (state.teamBStory.length > targetRoundIndex) {
+      state.teamBStory.splice(targetRoundIndex);
+    }
 
     await this.gamesRepository.saveGame(state);
   }
