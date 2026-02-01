@@ -261,18 +261,23 @@ export class RoomsGateway {
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { text: string; team: 'A' | 'B'; userToken: string },
   ) {
-    const user = await this.roomsService.getUserBySocket(client.id);
-    if (!user) throw new WsException('유저 세션 없음');
+    try {
+      const user = await this.roomsService.getUserBySocket(client.id);
+      if (!user) throw new WsException('유저 세션 없음');
 
-    const clean = this.gamesService.convertToDogSound(data.text);
+      const clean = this.gamesService.convertToDogSound(data.text);
+      await this.gamesService.submitStory(user.roomUuid, data.userToken, data.team, clean);
 
-    await this.gamesService.submitStory(user.roomUuid, data.userToken, data.team, clean);
+      this.server.to(user.roomUuid).emit('story_submitted', {
+        team: data.team,
+        writerToken: data.userToken,
+        text: clean,
+      });
 
-    this.server.to(user.roomUuid).emit('story_submitted', {
-      team: data.team,
-      writerToken: data.userToken,
-      text: clean,
-    });
+      return { status: 'success' };
+    } catch (error) {
+      return { status: 'error', message: error.message };
+    }
   }
 
   @SubscribeMessage('join_team')

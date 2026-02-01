@@ -42,6 +42,10 @@ channels:
         $ref: '#/components/messages/LeaveRoom'
       story_typing:
         $ref: '#/components/messages/StoryTyping'
+      submit_story:
+        $ref: '#/components/messages/SubmitStory'
+        x-response:
+          $ref: '#/components/messages/FunctionAcknowledgement'
       kick_user:
         $ref: '#/components/messages/KickUser'
       submit_vote:
@@ -98,6 +102,7 @@ operations:
       - $ref: '#/channels/~1/messages/start_game'
       - $ref: '#/channels/~1/messages/leave_room'
       - $ref: '#/channels/~1/messages/story_typing'
+      - $ref: '#/channels/~1/messages/submit_story'
       - $ref: '#/channels/~1/messages/kick_user'
       - $ref: '#/channels/~1/messages/submit_vote'
       - $ref: '#/channels/~1/messages/request_judging'
@@ -300,6 +305,28 @@ components:
           text:
             type: string
             description: 입력 중인 텍스트
+          team:
+            type: string
+            enum: [A, B]
+            description: 팀 정보
+          userToken:
+            type: string
+            description: 유저 토큰
+        required: [roomId, text, team, userToken]
+
+    SubmitStory:
+      name: submit_story
+      title: 스토리 제출
+      summary: 플레이어가 작성한 스토리를 제출합니다. (제출 성공/실패 응답 있음)
+      payload:
+        type: object
+        properties:
+          roomId:
+            type: string
+            description: 방 UUID
+          text:
+            type: string
+            description: 제출할 스토리 텍스트
           team:
             type: string
             enum: [A, B]
