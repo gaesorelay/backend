@@ -449,14 +449,6 @@ export class RoomsService {
 
     // 3. 관객(AUDIENCE) 리스트 확보 및 셔플
     const audience = users.filter((u) => u.role === 'AUDIENCE');
-
-    // (선택사항) 관객이 부족하면 에러? 아니면 있는 만큼만? -> 보통은 부족하면 에러 띄우는 게 낫습니다.
-    if (audience.length < totalNeeded) {
-      throw new BadRequestException(
-        `관객이 부족합니다. (필요: ${totalNeeded}, 현재 관객: ${audience.length})`,
-      );
-    }
-
     const shuffledAudience = this.shuffleArray([...audience]);
     const updatedUsersList: User[] = []; // 업데이트된 유저들 저장용
 
