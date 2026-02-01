@@ -1,4 +1,4 @@
-asyncapi: 3.0.0
+﻿asyncapi: 3.0.0
 info:
   title: 개소릴레이 WebSocket API
   version: 1.2.1
@@ -229,7 +229,7 @@ components:
     AutoFill:
       name: auto_fill
       title: 자동 채우기 (방장)
-      summary: 빈 슬롯을 관전자로 무작위 채웁니다.
+      summary: 빈 슬롯을 관전자로 무작위 채웁니다. (관객이 부족할 경우 가능한 인원만큼만 채웁니다)
       payload:
         type: object
         properties:
@@ -468,12 +468,21 @@ components:
       payload:
         type: object
         properties:
+          roomUuid: { type: string, description: 방 UUID }
           votesTeamA: { type: number }
           votesTeamB: { type: number }
           winner: { type: string, enum: [A, B, DRAW] }
-          totalScoreA: { type: number, description: AI 점수 포함 총점 A }
-          totalScoreB: { type: number, description: AI 점수 포함 총점 B }
-          judgeScores: { type: array, description: 심사위원별 점수 상세 }
+          aiJudges:
+            type: array
+            description: AI 심사 결과 목록
+            items:
+              type: object
+              properties:
+                judgeName: { type: string, description: 심사위원 이름 }
+                commentA: { type: string, description: A팀 심사 코멘트 }
+                commentB: { type: string, description: B팀 심사 코멘트 }
+                scoreTeamA: { type: number, description: A팀 점수 }
+                scoreTeamB: { type: number, description: B팀 점수 }
 
     Kicked:
       name: kicked
@@ -505,3 +514,4 @@ components:
         type: object
         properties:
           message: { type: string, description: 에러 메시지 }
+
