@@ -19,6 +19,11 @@ type GameFlowContext = {
   emitVoteResult?: (outcome: VoteOutcome) => void;
   nextAction?: () => void;
   currentStatus?: RoomStatus;
+  
+  // ⭐️ [추가] 롤백을 위한 상태 추적
+  currentTurn?: number; // 현재 턴 (PLAYING 시)
+  subStatus?: 'CARD_SHUFFLE' | 'JUDGE_SHUFFLE' | 'STORY' | 'VOTING' | 'JUDGING';
+  totalTurns?: number;
 };
 
 @Injectable()
@@ -61,7 +66,14 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * 현재 단계를 건너뛰고 바로 다음 로직을 실행한다.
+   * 캐시된 컨텍스트 없으면 조용히 리턴
+   */
+  private getContext(roomUuid: string) {
+    return this.contexts.get(roomUuid);
+  }
+
+  /**
+   * ⏭️ 현재 단계를 건너뛰고 바로 다음 로직을 실행한다.
    */
   async skipPhase(roomUuid: string) {
     const context = this.contexts.get(roomUuid);
@@ -74,8 +86,81 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
 
     // 2. 다음 로직 즉시 실행
     const action = context.nextAction;
-    context.nextAction = undefined; // 실행했으므로 비움
+    context.nextAction = undefined;
     action();
+  }
+
+  /**
+   * ⏪ [테스트용] 이전 단계로 돌아간다 + 데이터 롤백
+   */
+  async prevPhase(roomUuid: string) {
+    const context = this.getContext(roomUuid);
+    if (!context || !context.currentStatus) return;
+
+    // 1. 현재 타이머 취소
+    this.timerService.cancel(roomUuid, context.currentStatus);
+    context.nextAction = undefined; // 예약된 동작 제거
+
+    // 2. 상태별 분기
+    // PLAYING 상태 (턴 진행 중)
+    if (context.currentStatus === 'PLAYING' && context.currentTurn) {
+      const currentTurn = context.currentTurn;
+
+      // 1턴이면 -> WAITING (JUDGE_SHUFFLE) 로 이동
+      if (currentTurn <= 1) {
+        // 데이터 롤백 (0턴까지 = 다 지움)
+        await this.gamesService.rollbackStory(roomUuid, 0);
+        // WAITING의 JUDGE_SHUFFLE 단계로 진입
+        await this.restartWaitingFromJudge(roomUuid, context);
+        return;
+      }
+
+      // 2턴 이상이면 -> 이전 턴으로 이동
+      // 예: 2턴 중단 -> 1턴만 남김 (index 0, 1 중 0만 남김) -> 길이는 1
+      const prevTurn = currentTurn - 1;
+      await this.gamesService.rollbackStory(roomUuid, prevTurn - 1);
+      
+      const room = await this.roomsRepository.findById(roomUuid);
+      const roundMs = (room?.config.roundTime ?? 60) * 1000;
+
+      // 이전 턴 시작
+      await this.startTurnFlow(roomUuid, context, prevTurn, context.totalTurns || 8, roundMs);
+      return;
+    }
+
+    // WAITING 상태
+    if (context.currentStatus === 'WAITING') {
+      // JUDGE_SHUFFLE -> CARD_SHUFFLE로
+      if (context.subStatus === 'JUDGE_SHUFFLE') {
+        await this.handleWaiting(roomUuid, context); // 처음(CARD)부터 다시
+        return;
+      }
+      // 이미 CARD_SHUFFLE이면 -> 더 갈 곳 없음 (혹은 LOBBY?)
+      // 여기선 그냥 재시작
+      await this.handleWaiting(roomUuid, context);
+      return;
+    }
+
+    // RESULTING 상태
+    // 스토리/투표 중이면 -> 마지막 턴(8턴)으로 복귀
+    if (context.currentStatus === 'RESULTING' || context.currentStatus === 'ENDED') {
+      const room = await this.roomsRepository.findById(roomUuid);
+      const roundMs = (room?.config?.roundTime ?? 60) * 1000;
+      const totalTurns = 8;
+
+      // 7턴까지 남기고(길이 7) -> 8턴 시작
+      await this.gamesService.rollbackStory(roomUuid, totalTurns - 1);
+
+      // 다시 PLAYING 상태로 강제 변경 필요
+      context.currentStatus = 'PLAYING';
+      // startTurnFlow 내부에서 저장하겠지만 여기서 미리 setRoomStatus 할 수도 있음
+      // 하지만 startTurnFlow는 상태 변경 없이 PLAYING 유지 + emitStatus만 함
+      // 따라서 DB 상태도 되돌려야 함
+      await this.setRoomStatus(roomUuid, 'PLAYING');
+      
+      await this.startTurnFlow(roomUuid, context, totalTurns, totalTurns, roundMs);
+      return;
+    }
   }
 
   /**
@@ -131,21 +216,30 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
 
     // 새 게임 시작 시 이전 투표 상태는 초기화한다.
     this.gamesService.resetVoteState(roomUuid);
+    
+    context.subStatus = 'CARD_SHUFFLE';
     context.emitStatus('WAITING', CARD_SHUFFLE_TIME, 'CARD_SHUFFLE');
 
     // CARD_SHUFFLE 종료 후 JUDGE_SHUFFLE로 전환, 이후 PLAYING 시작
     this.scheduleNext(roomUuid, context, 'WAITING', CARD_SHUFFLE_TIME, () => {
-      context.emitStatus('WAITING', JUDGE_SHUFFLE_TIME, 'JUDGE_SHUFFLE');
-      this.scheduleNext(
-        roomUuid,
-        context,
-        'WAITING',
-        JUDGE_SHUFFLE_TIME,
-        () => {
-          void this.setRoomStatus(roomUuid, 'PLAYING');
-        },
-      );
+      this.restartWaitingFromJudge(roomUuid, context);
     });
+  }
+
+  // 💡 [Helper] JUDGE_SHUFFLE 단계부터 시작 (PrevPhase 등에서 호출)
+  private async restartWaitingFromJudge(roomUuid: string, context: GameFlowContext) {
+    context.subStatus = 'JUDGE_SHUFFLE';
+    context.emitStatus('WAITING', JUDGE_SHUFFLE_TIME, 'JUDGE_SHUFFLE');
+    
+    this.scheduleNext(
+      roomUuid,
+      context,
+      'WAITING',
+      JUDGE_SHUFFLE_TIME,
+      () => {
+        void this.setRoomStatus(roomUuid, 'PLAYING');
+      },
+    );
   }
 
   private async handlePlaying(roomUuid: string, context: GameFlowContext): Promise<void> {
@@ -154,8 +248,10 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
 
     // 라운드 시간은 방 설정값을 사용한다.
     const roundMs = room.config.roundTime * 1000;
-    // const roundMs = 3000;
     const totalTurns = 8; // 고정값
+    
+    context.totalTurns = totalTurns;
+
     this.startTurnFlow(roomUuid, context, 1, totalTurns, roundMs);
   }
 
@@ -164,6 +260,7 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
     if (!room) return;
 
     // STORY 단계
+    context.subStatus = 'STORY';
     context.emitStatus('RESULTING', STORY_TIME, 'STORY');
 
     const aiVotesPromise = this.buildAiJudgeScores(roomUuid);
@@ -172,9 +269,11 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
     // STORY -> VOTING -> JUDGING 순서로 진행
     this.scheduleNext(roomUuid, context, 'RESULTING', STORY_TIME, () => {
       const votingMs = room.config.voteTime * 1000;
+      context.subStatus = 'VOTING';
       context.emitStatus('RESULTING', votingMs, 'VOTING');
 
       this.scheduleNext(roomUuid, context, 'RESULTING', votingMs, () => {
+        context.subStatus = 'JUDGING';
         context.emitStatus('RESULTING', JUDGING_TIME, 'JUDGING');
 
         this.scheduleNext(roomUuid, context, 'RESULTING', JUDGING_TIME, () => {
@@ -215,9 +314,15 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
     totalTurns: number,
     roundMs: number,
   ): Promise<void> {
+    // Context에 현재 턴 저장
+    context.currentTurn = turnIndex;
+
     // PLAYING 상태는 유지하되, 사용자에게는 TURN 메시지로 안내한다.
     const displayStatus = `TURN${turnIndex}`;
     context.emitStatus('PLAYING', roundMs, displayStatus);
+    
+    // 💡 [추가] 턴 시작 로직 호출 (이미지/순서 계산)
+    await this.gamesService.startTurn(roomUuid, turnIndex);
 
     // 3. 타이머 스케줄링
     this.scheduleNext(roomUuid, context, 'PLAYING', roundMs, async () => {

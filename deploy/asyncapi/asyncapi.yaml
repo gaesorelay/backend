@@ -31,7 +31,11 @@ channels:
       leave_team:
         $ref: '#/components/messages/LeaveTeam'
       auto_fill:
-        $ref: '#/components/messages/AutoFill'
+        - $ref: "#/components/messages/AutoFill"
+        - $ref: "#/components/messages/SkipPhase"
+        - $ref: "#/components/messages/PrevPhase"
+      x-response:
+        $ref: "#/components/messages/FunctionAcknowledgement"
       start_game:
         $ref: '#/components/messages/StartGame'
       leave_room:
@@ -148,6 +152,16 @@ components:
       name: skip_phase
       title: 단계 건너뛰기
       summary: 현재 진행 중인 게임 단계를 강제로 건너뛰고 다음 로직을 실행합니다. (테스트용)
+      payload:
+        type: object
+        properties: {}
+        additionalProperties: false
+        required: []
+
+    PrevPhase:
+      name: prev_phase
+      title: 이전 단계로 되돌리기
+      summary: 현재 진행 중인 게임 단계를 취소하고 이전 단계로 되돌립니다. 데이터도 롤백됩니다. (테스트용)
       payload:
         type: object
         properties: {}

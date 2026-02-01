@@ -399,6 +399,21 @@ export class RoomsGateway {
   }
 
   /**
+   * ⏪ [테스트용] 이전 단계로 돌아가기
+   */
+  @SubscribeMessage('prev_phase')
+  async handlePrevPhase(@ConnectedSocket() client: Socket) {
+    this.logger.log(`prev_phase 요청: ${client.id}`);
+    try {
+      const user = await this.roomsService.getUserBySocket(client.id);
+      await this.gameFlowService.prevPhase(user.roomUuid);
+      return { status: 'success' };
+    } catch (error) {
+      return { status: 'error', message: error.message };
+    }
+  }
+
+  /**
    * 게임 시작 요청
    * - 서버 검증 후 실제 게임 시작
    */

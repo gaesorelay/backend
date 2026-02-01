@@ -300,6 +300,28 @@ export class GamesService {
   }
 
   /**
+   * ⏪ [롤백] 스토리를 특정 라운드까지만 남기고 자른다.
+   * targetRoundIndex: 되돌아갈 라운드 번호 (예: 2턴으로 돌아가려면 -> 1 (0, 1 인덱스만 남김))
+   * 즉, targetRoundIndex 길이만큼만 남기고 나머지는 버림
+   */
+  async rollbackStory(roomUuid: string, targetRoundIndex: number) {
+    const state = await this.gamesRepository.getGame(roomUuid);
+    if (!state) return;
+
+    // 길이 조정 (splice는 원본 배열 수정)
+    // 인자가 (start, deleteCount) 이므로
+    // targetRoundIndex부터 끝까지 삭제
+    if (state.teamAStory.length > targetRoundIndex) {
+      state.teamAStory.splice(targetRoundIndex);
+    }
+    if (state.teamBStory.length > targetRoundIndex) {
+      state.teamBStory.splice(targetRoundIndex);
+    }
+
+    await this.gamesRepository.saveGame(state);
+  }
+
+  /**
    * 🐕 [핵심] 욕설을 개소리로 변환하는 함수
    */
   public convertToDogSound(text: string): string {
