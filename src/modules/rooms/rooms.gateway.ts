@@ -224,6 +224,59 @@ export class RoomsGateway {
     }
   }
 
+  @SubscribeMessage('story_typing')
+  async handleTyping(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { text: string; team: 'A' | 'B'; userToken: string }, // roomId 제거
+  ) {
+    try {
+      // 1. 서버 세션에서 유저 정보 직접 조회
+      const user = await this.roomsService.getUserBySocket(client.id);
+      const roomId = user.roomUuid; // 서버가 알고 있는 진짜 방 ID
+
+      // 2. 권한 체크
+      // const isValid = await this.gamesService.validateWriter(roomId, data.userToken, data.team);
+      // if (!isValid) return;
+
+      const cleanMessage = this.gamesService.convertToDogSound(data.text);
+
+      // 3. 채팅과 동일한 방(roomId)으로 전송
+      client.to(roomId).emit('story_update', {
+        team: data.team,
+        text: cleanMessage,
+        writerToken: data.userToken,
+      });
+    } catch (e) {
+      this.logger.error(e);
+    }
+  }
+
+  // rooms.gateway.ts
+@SubscribeMessage('submit_story')
+async handleSubmitStory(@ConnectedSocket() client: Socket, @MessageBody() data: any) {
+  try {
+    const user = await this.roomsService.getUserBySocket(client.id);
+    if (!user) {
+      console.error(`❌ 유저를 찾을 수 없음! 소켓ID: ${client.id}`); // 이게 찍히면 100% 원인
+      return;
+    }
+
+    const cleanMessage = this.gamesService.convertToDogSound(data.text);
+    
+    // 이벤트를 쏠 때 방 ID가 유효한지 확인
+    this.server.to(user.roomUuid).emit('story_submitted', {
+      team: data.team,
+      writerToken: data.userToken,
+      text: cleanMessage,
+    });
+    
+  
+  } catch (e) {
+    console.error("🔥 서버 에러:", e);
+  }
+}
+
+
   @SubscribeMessage('join_team')
   async handleJoinTeam(
     @ConnectedSocket() client: Socket,
