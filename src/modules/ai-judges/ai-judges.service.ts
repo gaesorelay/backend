@@ -96,7 +96,7 @@ export class AiJudgeService {
         this.httpService.post<any>(
           url,
           {
-            model: 'gpt-5-mini', // 모델명 유지
+            model: 'gpt-4o-mini', // 모델명 유지
             messages: [
               {
                 role: 'system',
