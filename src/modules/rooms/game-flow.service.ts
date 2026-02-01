@@ -17,6 +17,8 @@ import {
 type GameFlowContext = {
   emitStatus: (status: RoomStatus, durationMs: number, displayStatus?: string) => void;
   emitVoteResult?: (outcome: VoteOutcome) => void;
+  nextAction?: () => void;
+  currentStatus?: RoomStatus;
 };
 
 @Injectable()
@@ -58,10 +60,49 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
     void this.setRoomStatus(roomUuid, 'WAITING');
   }
 
+  /**
+   * 현재 단계를 건너뛰고 바로 다음 로직을 실행한다.
+   */
+  async skipPhase(roomUuid: string) {
+    const context = this.contexts.get(roomUuid);
+    if (!context || !context.nextAction) return; // 예약된 다음 동작이 없으면 무시
+
+    // 1. 걸려있는 타이머 취소
+    if (context.currentStatus) {
+      this.timerService.cancel(roomUuid, context.currentStatus);
+    }
+
+    // 2. 다음 로직 즉시 실행
+    const action = context.nextAction;
+    context.nextAction = undefined; // 실행했으므로 비움
+    action();
+  }
+
+  /**
+   * 타이머를 걸면서 nextAction을 컨텍스트에 저장한다.
+   */
+  private scheduleNext(
+    roomUuid: string,
+    context: GameFlowContext,
+    status: RoomStatus,
+    delayMs: number,
+    callback: () => void,
+  ) {
+    context.currentStatus = status;
+    context.nextAction = callback; // 콜백 저장
+
+    this.timerService.schedule({ roomUuid, status, delayMs }, () => {
+      context.nextAction = undefined; // 타이머에 의해 실행되면 저장된 콜백 제거
+      callback();
+    });
+  }
+
   private async handleStatusChange(roomUuid: string, status: RoomStatus): Promise<void> {
     // 방에 등록된 흐름 정보가 없으면 무시한다.
     const context = this.contexts.get(roomUuid);
     if (!context) return;
+    
+    context.currentStatus = status; // 상태 갱신
 
     // 상태에 맞는 단계별 핸들러를 호출한다.
     if (status === 'WAITING') {
@@ -93,10 +134,13 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
     context.emitStatus('WAITING', CARD_SHUFFLE_TIME, 'CARD_SHUFFLE');
 
     // CARD_SHUFFLE 종료 후 JUDGE_SHUFFLE로 전환, 이후 PLAYING 시작
-    this.timerService.schedule({ roomUuid, status: 'WAITING', delayMs: CARD_SHUFFLE_TIME }, () => {
+    this.scheduleNext(roomUuid, context, 'WAITING', CARD_SHUFFLE_TIME, () => {
       context.emitStatus('WAITING', JUDGE_SHUFFLE_TIME, 'JUDGE_SHUFFLE');
-      this.timerService.schedule(
-        { roomUuid, status: 'WAITING', delayMs: JUDGE_SHUFFLE_TIME },
+      this.scheduleNext(
+        roomUuid,
+        context,
+        'WAITING',
+        JUDGE_SHUFFLE_TIME,
         () => {
           void this.setRoomStatus(roomUuid, 'PLAYING');
         },
@@ -126,14 +170,14 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
     this.aiVotePromises.set(roomUuid, aiVotesPromise);
 
     // STORY -> VOTING -> JUDGING 순서로 진행
-    this.timerService.schedule({ roomUuid, status: 'RESULTING', delayMs: STORY_TIME }, () => {
+    this.scheduleNext(roomUuid, context, 'RESULTING', STORY_TIME, () => {
       const votingMs = room.config.voteTime * 1000;
       context.emitStatus('RESULTING', votingMs, 'VOTING');
 
-      this.timerService.schedule({ roomUuid, status: 'RESULTING', delayMs: votingMs }, () => {
+      this.scheduleNext(roomUuid, context, 'RESULTING', votingMs, () => {
         context.emitStatus('RESULTING', JUDGING_TIME, 'JUDGING');
 
-        this.timerService.schedule({ roomUuid, status: 'RESULTING', delayMs: JUDGING_TIME }, () => {
+        this.scheduleNext(roomUuid, context, 'RESULTING', JUDGING_TIME, () => {
           void this.setRoomStatus(roomUuid, 'ENDED');
         });
       });
@@ -152,7 +196,7 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
       outcome = this.gamesService.applyAiJudgeVotes(roomUuid, aiScores);
     }
 
-    // 理쒖쥌 寃곌낵瑜?釉뚮줈?쒖틦?ㅽ듃?쒕떎.
+    // 최종 결과를 브로드캐스트한다.
     if (context.emitVoteResult) {
       context.emitVoteResult(outcome);
     }
@@ -176,7 +220,7 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
     context.emitStatus('PLAYING', roundMs, displayStatus);
 
     // 3. 타이머 스케줄링
-    this.timerService.schedule({ roomUuid, status: 'PLAYING', delayMs: roundMs }, async () => {
+    this.scheduleNext(roomUuid, context, 'PLAYING', roundMs, async () => {
       // 4. ⭐️ [추가] 턴 종료 처리 (버퍼 -> 스토리 저장)
       await this.gamesService.endTurn(roomUuid);
 

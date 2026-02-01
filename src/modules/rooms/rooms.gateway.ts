@@ -20,6 +20,7 @@ import { GamesService } from '../games/games.service';
 import { UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { WsThrottlerGuard } from '../../common/guards/ws-throttler.guard';
+import { GameFlowService } from './game-flow.service';
 
 @WebSocketGateway({
   namespace: 'game',
@@ -36,6 +37,7 @@ export class RoomsGateway {
     private readonly roomsService: RoomsService,
     private readonly aiJudgeService: AiJudgeService,
     private readonly gamesService: GamesService,
+    private readonly gameFlowService: GameFlowService,
   ) {}
 
   /**
@@ -375,6 +377,21 @@ export class RoomsGateway {
         users: updatedUsers,
       });
 
+      return { status: 'success' };
+    } catch (error) {
+      return { status: 'error', message: error.message };
+    }
+  }
+
+  /**
+   * 강제 단계 넘기기
+   */
+  @SubscribeMessage('skip_phase')
+  async handleSkipPhase(@ConnectedSocket() client: Socket) {
+    this.logger.log(`skip_phase 요청: ${client.id}`);
+    try {
+      const user = await this.roomsService.getUserBySocket(client.id);
+      await this.gameFlowService.skipPhase(user.roomUuid);
       return { status: 'success' };
     } catch (error) {
       return { status: 'error', message: error.message };

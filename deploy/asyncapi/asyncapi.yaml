@@ -44,6 +44,8 @@ channels:
         $ref: '#/components/messages/SubmitVote'
       request_judging:
         $ref: '#/components/messages/RequestJudging'
+      skip_phase:
+        $ref: '#/components/messages/SkipPhase'
 
       # Server -> Client Messages
       user_joined: # Legacy support
@@ -95,6 +97,7 @@ operations:
       - $ref: '#/channels/~1/messages/kick_user'
       - $ref: '#/channels/~1/messages/submit_vote'
       - $ref: '#/channels/~1/messages/request_judging'
+      - $ref: '#/channels/~1/messages/skip_phase'
 
   sendServerEvents:
     action: send
@@ -140,6 +143,16 @@ components:
             type: string
             description: 기존 유저 재접속 시 토큰 (선택)
         required: [roomId, nickname, avatarId]
+
+    SkipPhase:
+      name: skip_phase
+      title: 단계 건너뛰기
+      summary: 현재 진행 중인 게임 단계를 강제로 건너뛰고 다음 로직을 실행합니다. (테스트용)
+      payload:
+        type: object
+        properties: {}
+        additionalProperties: false
+        required: []
 
     RequestRoomInfo:
       name: request_room_info
