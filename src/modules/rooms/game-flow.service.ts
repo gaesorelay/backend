@@ -22,7 +22,7 @@ type GameFlowContext = {
 
   // ⭐️ [추가] 롤백을 위한 상태 추적
   currentTurn?: number; // 현재 턴 (PLAYING 시)
-  subStatus?: 'CARD_SHUFFLE' | 'JUDGE_SHUFFLE' | 'STORY' | 'VOTING' | 'JUDGING';
+  subStatus?: 'CARD_SHUFFLE' | 'JUDGE_SHUFFLE' | 'STORY' | 'VOTING' | 'JUDGE_RESULT';
   totalTurns?: number;
 };
 
@@ -267,8 +267,8 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
       context.emitStatus('RESULTING', votingMs, 'VOTING');
 
       this.scheduleNext(roomUuid, context, 'RESULTING', votingMs, () => {
-        context.subStatus = 'JUDGING';
-        context.emitStatus('RESULTING', JUDGING_TIME, 'JUDGING');
+        context.subStatus = 'JUDGE_RESULT';
+        context.emitStatus('RESULTING', JUDGING_TIME, 'JUDGE_RESULT');
 
         this.scheduleNext(roomUuid, context, 'RESULTING', JUDGING_TIME, () => {
           void this.setRoomStatus(roomUuid, 'ENDED');

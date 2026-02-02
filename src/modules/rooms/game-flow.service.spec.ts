@@ -126,7 +126,7 @@ describe('GameFlowService', () => {
       ['PLAYING', roundMs, 'TURN8'],
       ['RESULTING', STORY_TIME, 'STORY'],
       ['RESULTING', voteMs, 'VOTING'],
-      ['RESULTING', JUDGING_TIME, 'JUDGING'],
+      ['RESULTING', JUDGING_TIME, 'JUDGE_RESULT'],
       ['ENDED', 0, 'FINAL_RESULT'],
     ];
 
