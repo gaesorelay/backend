@@ -338,7 +338,7 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
 
     // RoomStatus 업데이트 후 Subject로 상태 변경을 전파한다.
     room.status = status;
-    await this.roomsRepository.save(room, 120);
+    await this.roomsRepository.save(room, 60 * 60);
     this.roomStatusSubject.notify({ roomUuid, status });
   }
 

@@ -165,6 +165,9 @@ export class RoomsGateway {
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { config: RoomConfig }, // 구체적인 Config 타입 사용 권장
   ) {
+    this.logger.log(
+      `update_room_config 요청: socket ${client.id}, config: ${JSON.stringify(data.config)}`,
+    );
     // Service 호출
     const room = await this.roomsService.updateRoomConfig(client.id, data.config);
 

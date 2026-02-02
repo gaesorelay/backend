@@ -162,7 +162,7 @@ export class RoomsService {
     }
 
     room.status = status;
-    await this.roomsRepository.save(room);
+    await this.roomsRepository.save(room, 60 * 60);
     this.roomStatusSubject.notify({ roomUuid, status });
 
     return room;
@@ -201,7 +201,8 @@ export class RoomsService {
 
     // 설정 업데이트 및 저장
     room.config = { ...room.config, ...newConfig };
-    await this.roomsRepository.save(room); // TTL 유지 로직 주의
+    await this.roomsRepository.save(room, 60 * 60); // TTL 유지 로직 주의
+    console.log(`방 설정 변경: ${roomUuid} by ${user.nickname}`, room.config);
 
     return room;
   }
@@ -494,7 +495,6 @@ export class RoomsService {
 
       if (nextTeam === 'A') teamACount += 1;
       else teamBCount += 1;
-
     }
 
     // 5. 전체 유저 리스트 다시 조회 (방송용)
