@@ -227,6 +227,27 @@ export class RoomsGateway {
     }
   }
 
+  @SubscribeMessage('send_emoji')
+  async handleEmoji(@ConnectedSocket() client: Socket, @MessageBody() data: { emojiId: number }) {
+    try {
+      // 1. 소켓 ID로 유저 정보 조회
+      const user = await this.roomsService.getUserBySocket(client.id);
+
+      // 2. 방 전체 브로드캐스트
+      this.server.to(user.roomUuid).emit('emoji_message', {
+        senderId: user.publicUserId,
+        nickname: user.nickname,
+        avatarId: user.avatarId,
+        emojiId: data.emojiId,
+        timestamp: Date.now(),
+      });
+
+      return { status: 'success' };
+    } catch (error) {
+      return { status: 'error', message: '이모지 전송 실패' };
+    }
+  }
+
   @SubscribeMessage('story_typing')
   async handleTyping(
     @ConnectedSocket() client: Socket,
@@ -266,7 +287,13 @@ export class RoomsGateway {
       if (!user) throw new WsException('유저 세션 없음');
 
       const clean = this.gamesService.convertToDogSound(data.text);
-      await this.gamesService.submitStory(user.roomUuid, data.userToken, data.team, clean, data.turn);
+      await this.gamesService.submitStory(
+        user.roomUuid,
+        data.userToken,
+        data.team,
+        clean,
+        data.turn,
+      );
 
       this.server.to(user.roomUuid).emit('story_submitted', {
         team: data.team,
