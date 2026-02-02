@@ -13,12 +13,6 @@ export class GamesService {
   // 라운드 종료 시 resetVoteState로 정리한다.
   private server: Server;
   private readonly voteStore = new Map<string, { votesTeamA: number; votesTeamB: number }>();
-  // AI 평가 입력 DTO도 서버 메모리에 저장한다.
-  // 스토리 제출 이벤트에서 setEvaluateDto로 저장해둔다.
-  private readonly evaluateStore = new Map<
-    string,
-    { teamA?: EvaluateSubmissionDto; teamB?: EvaluateSubmissionDto }
-  >();
   private filter: Filter;
 
   private readonly dogSounds = [
@@ -100,22 +94,29 @@ export class GamesService {
     return imageIds;
   }
 
-  setEvaluateDto(roomUuid: string, team: TeamSide, dto: EvaluateSubmissionDto): void {
-    // 팀별 평가 입력을 누적 저장한다.
-    const state = this.evaluateStore.get(roomUuid) ?? {};
-    if (team === 'A') {
-      state.teamA = dto;
-    } else {
-      state.teamB = dto;
+  async getEvaluateDto(roomUuid: string, team: TeamSide): Promise<EvaluateSubmissionDto | null> {
+    // 1. Redis에서 최신 게임 상태 조회
+    const state = await this.gamesRepository.getGame(roomUuid);
+    if (!state) {
+      console.log(`[getEvaluateDto] Redis에 방 데이터가 없습니다: ${roomUuid}`);
+      return null;
     }
-    this.evaluateStore.set(roomUuid, state);
-  }
 
-  getEvaluateDto(roomUuid: string, team: TeamSide): EvaluateSubmissionDto | null {
-    // 필요한 시점(RESULTING 시작)에 팀별 평가 입력을 조회한다.
-    const state = this.evaluateStore.get(roomUuid);
-    if (!state) return null;
-    return team === 'A' ? (state.teamA ?? null) : (state.teamB ?? null);
+    // 2. 팀별 스토리 조합 (배열 -> 문자열)
+    const storyList = team === 'A' ? state.teamAStory : state.teamBStory;
+    const fullStory = storyList.join(' '); // 문장들을 공백으로 이어 붙임
+
+    // 3. 이미지 정보 매핑 (ID -> 실제 객체)
+    // state.imageIDs에 저장된 ID들로 GAME_IMAGES 상수에서 원본 정보를 찾음
+    const images = state.imageIDs
+      .map((id) => GAME_IMAGES.find((img) => img.id === id))
+      .filter((img) => !!img); // undefined 제거
+
+    return {
+      sentence: fullStory,
+      genre: state.genre,
+      images: images as any,
+    };
   }
 
   submitAudienceVote(roomUuid: string, team: TeamSide): VoteOutcome {

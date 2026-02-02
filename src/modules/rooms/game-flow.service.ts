@@ -285,6 +285,13 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
     // 관객 투표 결과를 기본으로 가져온다.
     let outcome = this.gamesService.getVoteOutcome(roomUuid);
     if (aiScores && aiScores.length > 0) {
+      // 🔍 [디버그] AI 결과 로그 출력
+      console.log(`\n🤖 [AI 심사 결과 - Room ${roomUuid}]`);
+      aiScores.forEach((s) => {
+        console.log(`   [${s.judgeName}] A팀: ${s.scoreTeamA}점 / B팀: ${s.scoreTeamB}점`);
+        console.log(`   🗣️ "${s.commentA.substring(0, 30)}..." / "${s.commentB.substring(0, 30)}..."`);
+      });
+
       // AI 평가는 투표 수에 반영하지 않고 결과에 첨부한다.
       outcome = this.gamesService.applyAiJudgeVotes(roomUuid, aiScores);
     }
@@ -343,38 +350,51 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async buildAiJudgeScores(roomUuid: string): Promise<AiJudgeScore[] | null> {
-    // 스토리 제출 시 저장된 평가 입력이 없으면 AI 평가는 생략한다.
-    const teamAEvaluateDto = this.gamesService.getEvaluateDto(roomUuid, 'A');
-    const teamBEvaluateDto = this.gamesService.getEvaluateDto(roomUuid, 'B');
+    // Redis에서 데이터 조회 (await 사용)
+    const teamAEvaluateDto = await this.gamesService.getEvaluateDto(roomUuid, 'A');
+    const teamBEvaluateDto = await this.gamesService.getEvaluateDto(roomUuid, 'B');
+
     if (!teamAEvaluateDto || !teamBEvaluateDto) {
       return null;
     }
 
     // 팀 A/B의 평가를 동시에 요청한다.
-    const [teamAResults, teamBResults] = await Promise.all([
+    console.time(`⏱️ AI Evaluation Time (${roomUuid})`);
+    console.log(`🚀 Sending AI Request for Team A... (Room: ${roomUuid})`);
+    console.log(`🚀 Sending AI Request for Team B... (Room: ${roomUuid})`);
+    
+    const startTime = Date.now();
+
+    return Promise.all([
       this.aiJudgeService.evaluateRoom(roomUuid, teamAEvaluateDto),
       this.aiJudgeService.evaluateRoom(roomUuid, teamBEvaluateDto),
-    ]);
+    ]).then(([teamAResults, teamBResults]) => {
+        const duration = Date.now() - startTime;
+        console.timeEnd(`⏱️ AI Evaluation Time (${roomUuid})`);
+        console.log(`✅ AI Evaluation Completed in ${duration}ms`);
 
-    // 동일한 페르소나 기준으로 점수를 비교하기 위해 맵을 만든다.
-    const teamBMap = new Map(
-      teamBResults.map((result: PersonaResult) => [result.personaName, result]),
-    );
+        // 결과 처리 로직 (Map & Filter)
+        const teamBMap = new Map(
+          teamBResults.map((result: PersonaResult) => [result.personaName, result]),
+        );
 
-    // 페르소나별 점수 비교 데이터를 만든다.
-    return teamAResults
-      .map((aResult: PersonaResult) => {
-        const bResult = teamBMap.get(aResult.personaName);
-        if (!bResult) return null;
+        return teamAResults
+          .map((aResult: PersonaResult) => {
+            const bResult = teamBMap.get(aResult.personaName);
+            if (!bResult) return null;
 
-        return {
-          judgeName: aResult.personaName,
-          commentA: aResult.comment,
-          commentB: bResult.comment,
-          scoreTeamA: aResult.score,
-          scoreTeamB: bResult.score,
-        } as AiJudgeScore;
-      })
-      .filter((result): result is AiJudgeScore => result !== null);
+            return {
+              judgeName: aResult.personaName,
+              commentA: aResult.comment,
+              commentB: bResult.comment,
+              scoreTeamA: aResult.score,
+              scoreTeamB: bResult.score,
+            } as AiJudgeScore;
+          })
+          .filter((result): result is AiJudgeScore => result !== null);
+    }).catch(error => {
+        console.error(`❌ AI Evaluation Failed:`, error);
+        return null;
+    });
   }
 }

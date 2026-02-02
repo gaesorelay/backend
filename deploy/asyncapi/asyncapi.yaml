@@ -17,83 +17,115 @@ channels:
     messages:
       # Client -> Server Messages
       join_room:
-        $ref: '#/components/messages/JoinRoom'
+        $ref: "#/components/messages/JoinRoom"
       request_room_info:
-        $ref: '#/components/messages/RequestRoomInfo'
+        $ref: "#/components/messages/RequestRoomInfo"
       update_room_config:
-        $ref: '#/components/messages/UpdateRoomConfig'
+        $ref: "#/components/messages/UpdateRoomConfig"
       game_ready:
-        $ref: '#/components/messages/GameReady'
+        $ref: "#/components/messages/GameReady"
       send_chat:
         $ref: '#/components/messages/SendChat'
       send_emoji:
         $ref: '#/components/messages/SendEmoji'
       join_team:
-        $ref: '#/components/messages/JoinTeam'
+        $ref: "#/components/messages/JoinTeam"
       leave_team:
-        $ref: '#/components/messages/LeaveTeam'
+        $ref: "#/components/messages/LeaveTeam"
       auto_fill:
-        - $ref: "#/components/messages/AutoFill"
-        - $ref: "#/components/messages/SkipPhase"
-        - $ref: "#/components/messages/PrevPhase"
-      x-response:
-        $ref: "#/components/messages/FunctionAcknowledgement"
+        $ref: "#/components/messages/AutoFill"
       start_game:
-        $ref: '#/components/messages/StartGame'
+        $ref: "#/components/messages/StartGame"
       leave_room:
-        $ref: '#/components/messages/LeaveRoom'
+        $ref: "#/components/messages/LeaveRoom"
       story_typing:
-        $ref: '#/components/messages/StoryTyping'
+        $ref: "#/components/messages/StoryTyping"
       submit_story:
-        $ref: '#/components/messages/SubmitStory'
-        x-response:
-          $ref: '#/components/messages/FunctionAcknowledgement'
+        $ref: "#/components/messages/SubmitStory"
       kick_user:
-        $ref: '#/components/messages/KickUser'
+        $ref: "#/components/messages/KickUser"
       submit_vote:
-        $ref: '#/components/messages/SubmitVote'
+        $ref: "#/components/messages/SubmitVote"
       request_judging:
-        $ref: '#/components/messages/RequestJudging'
+        $ref: "#/components/messages/RequestJudging"
       skip_phase:
-        $ref: '#/components/messages/SkipPhase'
+        $ref: "#/components/messages/SkipPhase"
+      prev_phase:
+        $ref: "#/components/messages/PrevPhase"
 
       # Server -> Client Messages
       user_joined: # Legacy support
-        $ref: '#/components/messages/UserJoined'
+        $ref: "#/components/messages/UserJoined"
       user_left:
-        $ref: '#/components/messages/UserLeft'
+        $ref: "#/components/messages/UserLeft"
       lobby_updated:
-        $ref: '#/components/messages/LobbyUpdated'
+        $ref: "#/components/messages/LobbyUpdated"
       room_info:
-        $ref: '#/components/messages/RoomInfo'
+        $ref: "#/components/messages/RoomInfo"
       chat_message:
         $ref: '#/components/messages/ChatMessage'
       emoji_message:
         $ref: '#/components/messages/EmojiMessage'
       room_config_updated:
-        $ref: '#/components/messages/RoomConfigUpdated'
+        $ref: "#/components/messages/RoomConfigUpdated"
       game_started:
-        $ref: '#/components/messages/GameStarted'
+        $ref: "#/components/messages/GameStarted"
       change_phase:
-        $ref: '#/components/messages/ChangePhase'
+        $ref: "#/components/messages/ChangePhase"
       story_update:
-        $ref: '#/components/messages/StoryUpdate'
+        $ref: "#/components/messages/StoryUpdate"
       vote_updated:
-        $ref: '#/components/messages/VoteUpdated'
+        $ref: "#/components/messages/VoteUpdated"
       vote_result:
-        $ref: '#/components/messages/VoteResult'
+        $ref: "#/components/messages/VoteResult"
       kicked:
-        $ref: '#/components/messages/Kicked'
+        $ref: "#/components/messages/Kicked"
       judging_finished:
-        $ref: '#/components/messages/JudgingFinished'
+        $ref: "#/components/messages/JudgingFinished"
       error:
-        $ref: '#/components/messages/Error'
+        $ref: "#/components/messages/Error"
 
 operations:
   receiveClientActions:
     action: receive
     channel:
-      $ref: '#/channels/~1'
+      $ref: "#/channels/~1"
+    messages:
+      - $ref: "#/channels/~1/messages/join_room"
+      - $ref: "#/channels/~1/messages/request_room_info"
+      - $ref: "#/channels/~1/messages/update_room_config"
+      - $ref: "#/channels/~1/messages/game_ready"
+      - $ref: "#/channels/~1/messages/send_chat"
+      - $ref: "#/channels/~1/messages/join_team"
+      - $ref: "#/channels/~1/messages/leave_team"
+      - $ref: "#/channels/~1/messages/auto_fill"
+      - $ref: "#/channels/~1/messages/start_game"
+      - $ref: "#/channels/~1/messages/leave_room"
+      - $ref: "#/channels/~1/messages/story_typing"
+      - $ref: "#/channels/~1/messages/submit_story"
+      - $ref: "#/channels/~1/messages/kick_user"
+      - $ref: "#/channels/~1/messages/submit_vote"
+      - $ref: "#/channels/~1/messages/request_judging"
+      - $ref: "#/channels/~1/messages/skip_phase"
+      - $ref: "#/channels/~1/messages/prev_phase"
+
+  # ACK(콜백) 형태를 쓰는 이벤트를 reply로 명시
+  ack_request_room_info:
+    action: receive
+    channel:
+      $ref: "#/channels/~1"
+    messages:
+      - $ref: "#/channels/~1/messages/request_room_info"
+    reply:
+      channel:
+        $ref: "#/channels/~1"
+      messages:
+        - $ref: "#/channels/~1/messages/room_info"
+
+  ack_submit_story:
+    action: receive
+    channel:
+      $ref: "#/channels/~1"
     messages:
       - $ref: '#/channels/~1/messages/join_room'
       - $ref: '#/channels/~1/messages/request_room_info'
@@ -116,7 +148,7 @@ operations:
   sendServerEvents:
     action: send
     channel:
-      $ref: '#/channels/~1'
+      $ref: "#/channels/~1"
     messages:
       - $ref: '#/channels/~1/messages/user_joined'
       - $ref: '#/channels/~1/messages/user_left'
@@ -394,6 +426,20 @@ components:
             description: 방 UUID
         required: [roomId]
 
+    FunctionAcknowledgement:
+      name: ack
+      title: ACK 응답
+      summary: 클라이언트 emit callback(ACK)으로 반환되는 공통 응답입니다.
+      payload:
+        type: object
+        properties:
+          status:
+            type: string
+            enum: [success, error]
+          message:
+            type: string
+        required: [status]
+
     # -----------------------------------------------------
     # Server -> Client
     # -----------------------------------------------------
@@ -432,7 +478,7 @@ components:
     RoomInfo:
       name: room_info
       title: 방 정보 응답
-      summary: request_room_info 요청에 대한 ACK 응답을 전달합니다.
+      summary: request_room_info 요청에 대한 ACK 응답(또는 서버 이벤트)입니다.
       payload:
         type: object
         properties:
@@ -455,6 +501,7 @@ components:
           message:
             type: string
             description: 에러 메시지 (error 시)
+
     ChatMessage:
       name: chat_message
       title: 채팅 수신
@@ -576,17 +623,18 @@ components:
 
     Kicked:
       name: kicked
-      title: "강퇴 알림"
-      summary: "방장에서 강퇴된 사실을 사용자에게 알립니다."
+      title: 강퇴 알림
+      summary: 방장에서 강퇴된 사실을 사용자에게 알립니다.
       payload:
         type: object
         properties:
           roomUuid:
             type: string
-            description: "방 UUID"
+            description: 방 UUID
           reason:
             type: string
-            description: "강퇴 사유"
+            description: 강퇴 사유
+
     JudgingFinished:
       name: judging_finished
       title: 심사 완료 알림
@@ -604,4 +652,3 @@ components:
         type: object
         properties:
           message: { type: string, description: 에러 메시지 }
-
