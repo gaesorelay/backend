@@ -6,25 +6,40 @@ import { WsException } from '@nestjs/websockets';
 export class WsThrottlerGuard extends ThrottlerGuard {
   async handleRequest(requestProps: ThrottlerRequest): Promise<boolean> {
     const { context, limit, ttl, throttler } = requestProps;
+    console.log(limit);
 
     const client = context.switchToWs().getClient();
-    const ip = client.handshake?.address || client.id;
+    const headers = client.handshake?.headers || {};
+    const ip = headers['x-forwarded-for'] || client.handshake?.address || 'unknown';
+
     const throttlerName = throttler.name ?? 'default';
-    const key = this.generateKey(context, ip, throttlerName);
 
-    const blockDuration = (throttler.blockDuration as number) || 0;
+    // 🚨 [해결] 함수인지 숫자인지 체크해서 무조건 'number'로 뽑아냅니다.
+    const numericTtl = typeof ttl === 'function' ? await (ttl as Function)(context) : ttl;
+    console.log(ttl, numericTtl, throttler.blockDuration);
 
-    // 5. increment 호출
-    const { totalHits } = await this.storageService.increment(
+    // 🚨 [핵심] 키를 'IP-이름'으로 고정해서 카운트가 리셋되지 않게 합니다.
+    const key = `${ip}-${throttlerName}`;
+    const numericBlockDuration =
+      typeof throttler.blockDuration === 'function'
+        ? await (throttler.blockDuration as Function)(context)
+        : (throttler.blockDuration as number) || 0;
+
+    // 이제 numericTtl과 numericLimit은 확실히 number 타입입니다.
+    const { totalHits, timeToExpire } = await this.storageService.increment(
       key,
-      ttl,
+      numericTtl,
       limit,
-      blockDuration,
+      numericBlockDuration as number,
       throttlerName,
     );
 
-    // 6. 제한 초과 시 에러 던지기
+    console.log(
+      `🛡️ [${throttlerName}] Key:${key} | Count: ${totalHits}/${limit} | TTL: ${numericTtl}남은시간(초): ${timeToExpire}, BlockDuration: ${numericBlockDuration}`,
+    );
+
     if (totalHits > limit) {
+      console.error(`🚫 [차단됨] ${throttlerName} 규칙 위반!`);
       throw new WsException({
         status: 'error',
         message: '도배하지 마세요! 🐶 (요청 과다)',

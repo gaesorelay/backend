@@ -235,7 +235,13 @@ export class GamesService {
    * 📝 [제출] 유저가 작성을 완료해서 보냄
    * - turn: 클라이언트가 명시한 턴 (1-based)
    */
-  async submitStory(roomUuid: string, userToken: string, team: 'A' | 'B', text: string, turn: number) {
+  async submitStory(
+    roomUuid: string,
+    userToken: string,
+    team: 'A' | 'B',
+    text: string,
+    turn: number,
+  ) {
     const state = await this.gamesRepository.getGame(roomUuid);
     if (!state) return;
 
@@ -250,11 +256,11 @@ export class GamesService {
 
     // 배열 구멍이 생길 수 있지만, 요청대로 "해당 턴"에 꽂아넣음
     if (storyList[targetIndex]) {
-       console.log(`[SubmitStory] Overwrite turn ${turn}: ${text}`);
+      console.log(`[SubmitStory] Overwrite turn ${turn}: ${text}`);
     } else {
-       console.log(`[SubmitStory] New submission turn ${turn}: ${text}`);
+      console.log(`[SubmitStory] New submission turn ${turn}: ${text}`);
     }
-    
+
     storyList[targetIndex] = text;
 
     // 3. 변경사항 저장
