@@ -43,6 +43,7 @@ describe('RoomsService.joinTeam', () => {
   });
 
   // 방장이 다른 유저를 팀에 배정하는 정상 케이스
+  // 방장이 다른 유저를 팀에 배정하는 정상 케이스
   it('assigns team when requester is host', async () => {
     const requester: User = {
       userToken: 'token-host',
@@ -95,6 +96,7 @@ describe('RoomsService.joinTeam', () => {
   });
 
   // 일반 유저가 다른 유저를 배정하려고 하면 거부
+  // 일반 유저가 다른 유저를 배정하려고 하면 거절
   it('rejects when non-host assigns other user', async () => {
     const requester: User = {
       userToken: 'token-user',
@@ -138,6 +140,7 @@ describe('RoomsService.joinTeam', () => {
   });
 
   // 일반 유저가 자기 자신을 팀에 배정하는 경우 허용
+  // 일반 유저가 본인을 배정하는 경우는 허용
   it('allows non-host to assign self', async () => {
     const requester: User = {
       userToken: 'token-user',
@@ -169,6 +172,7 @@ describe('RoomsService.joinTeam', () => {
   });
 
   // 팀 값이 잘못된 경우 예외 발생
+  // 팀 입력이 잘못된 경우 예외 발생
   it('throws when team input is invalid', async () => {
     const requester: User = {
       userToken: 'token-host',
@@ -198,6 +202,7 @@ describe('RoomsService.joinTeam', () => {
   });
 
   // 소켓 매핑 정보가 없으면 유저를 찾을 수 없음
+  // 소켓 매핑이 없으면 유저를 찾을 수 없음
   it('throws when mapping is missing', async () => {
     roomsRepository.getMappingBySocketId.mockResolvedValue(null);
 
@@ -266,6 +271,7 @@ describe('RoomsService.joinRoom', () => {
   });
 
   // 재접속 토큰이 유효하면 기존 유저를 반환하고 소켓/TTL을 갱신
+  // 재접속 시 기존 유저를 반환하고 소켓/TTL을 갱신
   it('returns existing user on reconnect', async () => {
     const existingUser: User = {
       userToken: 'existing-token',
@@ -310,6 +316,7 @@ describe('RoomsService.joinRoom', () => {
   });
 
   // 방이 없으면 예외
+  // 방이 존재하지 않으면 예외 발생
   it('throws when room does not exist', async () => {
     roomsRepository.findById.mockResolvedValue(null);
 
@@ -319,6 +326,7 @@ describe('RoomsService.joinRoom', () => {
   });
 
   // 인원이 가득 찼으면 입장 불가
+  // 정원 초과일 때 입장 불가
   it('throws when room is full', async () => {
     roomsRepository.findById.mockResolvedValue(room);
     roomsRepository.getUserCount.mockResolvedValue(4);
@@ -329,6 +337,7 @@ describe('RoomsService.joinRoom', () => {
   });
 
   // 첫 입장은 HOST로 배정되고 owner 토큰 사용
+  // 첫 입장 유저는 호스트로 생성
   it('creates host when first user', async () => {
     roomsRepository.findById.mockResolvedValue(room);
     roomsRepository.getUserCount.mockResolvedValue(0);
@@ -354,6 +363,7 @@ describe('RoomsService.joinRoom', () => {
   });
 
   // 일반 입장은 PLAYER(AUDIENCE)로 배정되고 새 토큰 발급
+  // 첫 입장이 아닌 경우 관전자(AUDIENCE)로 생성
   it('creates audience when not first user', async () => {
     roomsRepository.findById.mockResolvedValue(room);
     roomsRepository.getUserCount.mockResolvedValue(1);
@@ -368,6 +378,232 @@ describe('RoomsService.joinRoom', () => {
     expect(result.userToken).toBe('new-token');
     expect(result.publicUserId).toBe(8);
     expect(roomsRepository.saveUser).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('RoomsService.autoFillSlots', () => {
+  let service: RoomsService;
+  let roomsRepository: {
+    getMappingBySocketId: jest.Mock;
+    findUserByToken: jest.Mock;
+    findById: jest.Mock;
+    getUsersInRoom: jest.Mock;
+    saveUser: jest.Mock;
+  };
+
+  const roomUuid = 'ROOM123';
+  const room: Room = {
+    roomUuid,
+    ownerUserToken: 'owner-token',
+    title: 'room',
+    status: 'WAITING',
+    config: {
+      maxPlayers: 8,
+      storytellerCount: 4,
+      rounds: 1,
+      roundTime: 60,
+      voteTime: 60,
+    },
+    createdAt: 0,
+  };
+
+  const makeUser = (overrides: Partial<User>): User => ({
+    userToken: overrides.userToken ?? 'token',
+    publicUserId: overrides.publicUserId ?? 1,
+    currentSocketId: overrides.currentSocketId ?? 'socket',
+    roomUuid,
+    nickname: overrides.nickname ?? 'user',
+    role: overrides.role ?? 'AUDIENCE',
+    isHost: overrides.isHost ?? false,
+    team: overrides.team ?? null,
+    slotIndex: overrides.slotIndex ?? null,
+    avatarId: overrides.avatarId ?? 1,
+    isReady: overrides.isReady ?? false,
+    IP: overrides.IP ?? '111.111.111.111',
+  });
+
+  beforeEach(() => {
+    roomsRepository = {
+      getMappingBySocketId: jest.fn(),
+      findUserByToken: jest.fn(),
+      findById: jest.fn(),
+      getUsersInRoom: jest.fn(),
+      saveUser: jest.fn(),
+    };
+    service = new RoomsService(
+      roomsRepository as unknown as any,
+      mockGamesService,
+      mockTimerService,
+      mockAiJudgeService,
+    );
+    jest
+      .spyOn(service as any, 'shuffleArray')
+      .mockImplementation((array: User[]) => array);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  // A 1명, B 3명, 관객 3명인 경우 팀 균형을 먼저 맞춤
+  it('fills to balance teams first (A:1, B:3, audience:3 -> A gets 3)', async () => {
+    // Given: A has 1, B has 3, and there are 3 audience members.
+    const host = makeUser({
+      userToken: 'host',
+      publicUserId: 10,
+      isHost: true,
+      role: 'AUDIENCE',
+      team: null,
+    });
+    const teamA = [makeUser({ publicUserId: 1, role: 'PLAYER', team: 'A', slotIndex: 0 })];
+    const teamB = [
+      makeUser({ publicUserId: 2, role: 'PLAYER', team: 'B', slotIndex: 0 }),
+      makeUser({ publicUserId: 3, role: 'PLAYER', team: 'B', slotIndex: 1 }),
+      makeUser({ publicUserId: 4, role: 'PLAYER', team: 'B', slotIndex: 2 }),
+    ];
+    const audience = [
+      makeUser({ publicUserId: 5 }),
+      makeUser({ publicUserId: 6 }),
+      makeUser({ publicUserId: 7 }),
+    ];
+    const users = [host, ...teamA, ...teamB, ...audience];
+
+    roomsRepository.getMappingBySocketId.mockResolvedValue({
+      roomUuid,
+      userToken: host.userToken,
+    });
+    roomsRepository.findUserByToken.mockResolvedValue(host);
+    roomsRepository.findById.mockResolvedValue(room);
+    roomsRepository.getUsersInRoom.mockResolvedValue(users);
+
+    const result = await service.autoFillSlots('socket-host');
+
+    // Then: 4 audience members 중 3명은 A, 1명은 B로 이동해 균형을 맞춤.
+    const savedUsers = roomsRepository.saveUser.mock.calls.map((call) => call[0] as User);
+    const filledToA = savedUsers.filter((u) => u.team === 'A');
+    const filledToB = savedUsers.filter((u) => u.team === 'B');
+    expect(filledToA).toHaveLength(3);
+    expect(filledToB).toHaveLength(1);
+    expect(result.updatedUsers.length).toBe(users.length);
+  });
+
+  // 양 팀이 비었고 관객 수가 짝수면 1:1로 분배
+  it('splits evenly when both teams are empty and audience is even', async () => {
+    // Given: A=0, B=0, audience=2.
+    const host = makeUser({
+      userToken: 'host',
+      publicUserId: 10,
+      isHost: true,
+      role: 'AUDIENCE',
+      team: null,
+    });
+    const audience = [makeUser({ publicUserId: 5 }), makeUser({ publicUserId: 6 })];
+    const users = [host, ...audience];
+
+    roomsRepository.getMappingBySocketId.mockResolvedValue({
+      roomUuid,
+      userToken: host.userToken,
+    });
+    roomsRepository.findUserByToken.mockResolvedValue(host);
+    roomsRepository.findById.mockResolvedValue(room);
+    roomsRepository.getUsersInRoom.mockResolvedValue(users);
+
+    await service.autoFillSlots('socket-host');
+
+    const savedUsers = roomsRepository.saveUser.mock.calls.map((call) => call[0] as User);
+    // 총 3명이 배정되므로 A 2명, B 1명 배정이 기대됨.
+    expect(savedUsers.filter((u) => u.team === 'A')).toHaveLength(2);
+    expect(savedUsers.filter((u) => u.team === 'B')).toHaveLength(1);
+  });
+
+  // 한 팀이 꽉 찼으면 다른 팀만 채움
+  it('fills only the team with empty slots when the other team is full', async () => {
+    // Given: A is full, B has empty slots, audience=2.
+    const host = makeUser({
+      userToken: 'host',
+      publicUserId: 10,
+      isHost: true,
+      role: 'AUDIENCE',
+      team: null,
+    });
+    const teamA = [
+      makeUser({ publicUserId: 1, role: 'PLAYER', team: 'A', slotIndex: 0 }),
+      makeUser({ publicUserId: 2, role: 'PLAYER', team: 'A', slotIndex: 1 }),
+      makeUser({ publicUserId: 3, role: 'PLAYER', team: 'A', slotIndex: 2 }),
+      makeUser({ publicUserId: 4, role: 'PLAYER', team: 'A', slotIndex: 3 }),
+    ];
+    const audience = [makeUser({ publicUserId: 5 }), makeUser({ publicUserId: 6 })];
+    const users = [host, ...teamA, ...audience];
+
+    roomsRepository.getMappingBySocketId.mockResolvedValue({
+      roomUuid,
+      userToken: host.userToken,
+    });
+    roomsRepository.findUserByToken.mockResolvedValue(host);
+    roomsRepository.findById.mockResolvedValue(room);
+    roomsRepository.getUsersInRoom.mockResolvedValue(users);
+
+    await service.autoFillSlots('socket-host');
+
+    const savedUsers = roomsRepository.saveUser.mock.calls.map((call) => call[0] as User);
+    expect(savedUsers.every((u) => u.team === 'B')).toBe(true);
+  });
+
+  // 빈 슬롯이 없으면 예외 발생
+  it('throws when there are no empty slots', async () => {
+    // Given: all slots are already filled.
+    const host = makeUser({
+      userToken: 'host',
+      publicUserId: 10,
+      isHost: true,
+      role: 'AUDIENCE',
+      team: null,
+    });
+    const teamA = [
+      makeUser({ publicUserId: 1, role: 'PLAYER', team: 'A', slotIndex: 0 }),
+      makeUser({ publicUserId: 2, role: 'PLAYER', team: 'A', slotIndex: 1 }),
+      makeUser({ publicUserId: 3, role: 'PLAYER', team: 'A', slotIndex: 2 }),
+      makeUser({ publicUserId: 4, role: 'PLAYER', team: 'A', slotIndex: 3 }),
+    ];
+    const teamB = [
+      makeUser({ publicUserId: 5, role: 'PLAYER', team: 'B', slotIndex: 0 }),
+      makeUser({ publicUserId: 6, role: 'PLAYER', team: 'B', slotIndex: 1 }),
+      makeUser({ publicUserId: 7, role: 'PLAYER', team: 'B', slotIndex: 2 }),
+      makeUser({ publicUserId: 8, role: 'PLAYER', team: 'B', slotIndex: 3 }),
+    ];
+    const users = [host, ...teamA, ...teamB];
+
+    roomsRepository.getMappingBySocketId.mockResolvedValue({
+      roomUuid,
+      userToken: host.userToken,
+    });
+    roomsRepository.findUserByToken.mockResolvedValue(host);
+    roomsRepository.findById.mockResolvedValue(room);
+    roomsRepository.getUsersInRoom.mockResolvedValue(users);
+
+    await expect(service.autoFillSlots('socket-host')).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  // 요청자가 방장이 아니면 거절
+  it('throws when requester is not host', async () => {
+    // Given: requester is not host.
+    const requester = makeUser({ userToken: 'user', publicUserId: 10, isHost: false });
+
+    roomsRepository.getMappingBySocketId.mockResolvedValue({
+      roomUuid,
+      userToken: requester.userToken,
+    });
+    roomsRepository.findUserByToken.mockResolvedValue(requester);
+
+    await expect(service.autoFillSlots('socket-user')).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  // 소켓 매핑이 없으면 예외 발생
+  it('throws when socket mapping is missing', async () => {
+    // Given: socket mapping does not exist.
+    roomsRepository.getMappingBySocketId.mockResolvedValue(null);
+
+    await expect(service.autoFillSlots('socket-missing')).rejects.toBeInstanceOf(NotFoundException);
   });
 });
 
@@ -402,6 +638,7 @@ describe('RoomsService.leaveTeam', () => {
     );
   });
 
+  // 방장은 다른 유저를 팀에서 제거 가능
   it('allows host to remove another user from team', async () => {
     const requester: User = {
       userToken: 'token-host',
@@ -452,6 +689,7 @@ describe('RoomsService.leaveTeam', () => {
     expect(result.roomUuid).toBe(roomUuid);
   });
 
+  // 본인은 스스로 팀에서 나갈 수 있음
   it('allows user to remove self from team', async () => {
     const requester: User = {
       userToken: 'token-user',
@@ -482,6 +720,7 @@ describe('RoomsService.leaveTeam', () => {
     expect(result.updatedUser.slotIndex).toBe(2);
   });
 
+  // 일반 유저가 타인을 제거하려 하면 거절
   it('rejects when non-host removes other user', async () => {
     const requester: User = {
       userToken: 'token-user1',
@@ -522,6 +761,7 @@ describe('RoomsService.leaveTeam', () => {
     );
   });
 
+  // 팀 입력이 잘못되면 거절
   it('rejects when team input is invalid', async () => {
     const requester: User = {
       userToken: 'token-user',
@@ -549,6 +789,7 @@ describe('RoomsService.leaveTeam', () => {
     );
   });
 
+  // 소켓 매핑이 없으면 예외 발생
   it('throws when mapping is missing', async () => {
     roomsRepository.getMappingBySocketId.mockResolvedValue(null);
 
@@ -585,6 +826,7 @@ describe('RoomsService.setUserReady', () => {
     );
   });
 
+  // 준비 상태 업데이트 후 유저 목록을 반환
   it('updates ready state and returns users', async () => {
     const user: User = {
       userToken: 'token-user',
@@ -619,12 +861,14 @@ describe('RoomsService.setUserReady', () => {
     expect(result.roomUuid).toBe(roomUuid);
   });
 
+  // 소켓 매핑이 없으면 예외 발생
   it('throws when mapping is missing', async () => {
     roomsRepository.getMappingBySocketId.mockResolvedValue(null);
 
     await expect(service.setUserReady('socket1', true)).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  // 유저가 없으면 예외 발생
   it('throws when user is missing', async () => {
     roomsRepository.getMappingBySocketId.mockResolvedValue({
       roomUuid,
@@ -665,6 +909,7 @@ describe('RoomsService.kickUser', () => {
     );
   });
 
+  // 방장이 대상 유저를 강퇴하는 정상 케이스
   it('kicks target user when requester is host', async () => {
     const requester: User = {
       userToken: 'token-host',
@@ -714,6 +959,7 @@ describe('RoomsService.kickUser', () => {
     expect(result.roomUuid).toBe(roomUuid);
   });
 
+  // 방장이 아니면 강퇴 불가
   it('rejects when requester is not host', async () => {
     const requester: User = {
       userToken: 'token-user1',
@@ -752,6 +998,7 @@ describe('RoomsService.kickUser', () => {
     await expect(service.kickUser('socket1', 2)).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  // 방장이 자기 자신을 강퇴하려 하면 거절
   it('rejects when host tries to kick self', async () => {
     const requester: User = {
       userToken: 'token-host',
@@ -777,12 +1024,14 @@ describe('RoomsService.kickUser', () => {
     await expect(service.kickUser('socket1', 1)).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  // 소켓 매핑이 없으면 예외 발생
   it('throws when mapping is missing', async () => {
     roomsRepository.getMappingBySocketId.mockResolvedValue(null);
 
     await expect(service.kickUser('socket1', 2)).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  // 요청자가 없으면 예외 발생
   it('throws when requester is missing', async () => {
     roomsRepository.getMappingBySocketId.mockResolvedValue({
       roomUuid,
@@ -793,6 +1042,7 @@ describe('RoomsService.kickUser', () => {
     await expect(service.kickUser('socket1', 2)).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  // 대상 유저가 없으면 예외 발생
   it('throws when target user is missing', async () => {
     const requester: User = {
       userToken: 'token-host',
@@ -850,6 +1100,7 @@ describe('RoomsService.leaveRoom', () => {
     );
   });
 
+  // 소켓 매핑이 없으면 null 반환
   it('returns null when mapping is missing', async () => {
     roomsRepository.getMappingBySocketId.mockResolvedValue(null);
 
@@ -859,6 +1110,7 @@ describe('RoomsService.leaveRoom', () => {
     expect(roomsRepository.findUserByToken).not.toHaveBeenCalled();
   });
 
+  // 유저가 없으면 null 반환
   it('returns null when user is missing', async () => {
     roomsRepository.getMappingBySocketId.mockResolvedValue({
       roomUuid,
@@ -872,6 +1124,7 @@ describe('RoomsService.leaveRoom', () => {
     expect(roomsRepository.deleteUser).not.toHaveBeenCalled();
   });
 
+  // 마지막 유저가 나가면 방 삭제
   it('deletes room when last user leaves', async () => {
     roomsRepository.getMappingBySocketId.mockResolvedValue({
       roomUuid,
@@ -890,6 +1143,7 @@ describe('RoomsService.leaveRoom', () => {
     expect(result).toEqual({ roomUuid, nickname: 'user' });
   });
 
+  // 유저가 남아있으면 방 유지
   it('keeps room when users remain', async () => {
     roomsRepository.getMappingBySocketId.mockResolvedValue({
       roomUuid,
