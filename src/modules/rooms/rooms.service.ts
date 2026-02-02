@@ -453,29 +453,48 @@ export class RoomsService {
     const updatedUsersList: User[] = []; // 업데이트된 유저들 저장용
 
     // 4. 슬롯 채우기 (DB 업데이트)
-    // Team A
-    for (const slot of emptySlotsA) {
+    // - 현재 팀 인원을 최대한 맞추면서 채움.
+    let teamACount = users.filter((u) => u.team === 'A').length;
+    let teamBCount = users.filter((u) => u.team === 'B').length;
+    const getNextTeam = (): UserTeam | null => {
+      const hasA = emptySlotsA.length > 0;
+      const hasB = emptySlotsB.length > 0;
+      if (!hasA && !hasB) return null;
+      if (hasA && !hasB) return 'A';
+      if (hasB && !hasA) return 'B';
+
+      if (teamACount < teamBCount) return 'A';
+      if (teamBCount < teamACount) return 'B';
+
+      if (emptySlotsA.length > emptySlotsB.length) return 'A';
+      if (emptySlotsB.length > emptySlotsA.length) return 'B';
+
+      return 'A';
+    };
+
+    while (shuffledAudience.length > 0) {
+      const nextTeam = getNextTeam();
+      if (!nextTeam) break;
+
       const targetUser = shuffledAudience.pop();
-      if (targetUser) {
-        targetUser.role = 'PLAYER';
-        targetUser.team = 'A';
-        targetUser.slotIndex = slot;
-        targetUser.isReady = false; // 강제로 들어갔으니 준비 해제
-        await this.roomsRepository.saveUser(targetUser);
-        updatedUsersList.push(targetUser);
+      if (!targetUser) break;
+
+      const slot = nextTeam === 'A' ? emptySlotsA.shift() : emptySlotsB.shift();
+      if (slot === undefined) {
+        // Safety: slot list can be empty due to race conditions or missing data.
+        continue;
       }
-    }
-    // Team B
-    for (const slot of emptySlotsB) {
-      const targetUser = shuffledAudience.pop();
-      if (targetUser) {
-        targetUser.role = 'PLAYER';
-        targetUser.team = 'B';
-        targetUser.slotIndex = slot;
-        targetUser.isReady = false;
-        await this.roomsRepository.saveUser(targetUser);
-        updatedUsersList.push(targetUser);
-      }
+
+      targetUser.role = 'PLAYER';
+      targetUser.team = nextTeam;
+      targetUser.slotIndex = slot;
+      targetUser.isReady = false; // 강제로 들어갔으니 준비 해제
+      await this.roomsRepository.saveUser(targetUser);
+      updatedUsersList.push(targetUser);
+
+      if (nextTeam === 'A') teamACount += 1;
+      else teamBCount += 1;
+
     }
 
     // 5. 전체 유저 리스트 다시 조회 (방송용)
