@@ -90,7 +90,6 @@ export class AiJudgeService {
 
     // 문맥 데이터 조립 (기존 로직 유지한다고 가정)
     const contextPrompt = this.buildContextPrompt(dto);
-    this.logger.debug(`📝 Prompt sent for ${judge.name}: ${contextPrompt.substring(0, 50)}...`);
 
     try {
       const response = await firstValueFrom(
