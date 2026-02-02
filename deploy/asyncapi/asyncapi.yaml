@@ -1,7 +1,7 @@
 ﻿asyncapi: 3.0.0
 info:
   title: 개소릴레이 WebSocket API
-  version: 1.2.1
+  version: 1.2.2
   description: '개소릴레이 게임 진행을 위한 WebSocket API 명세 (Namespace: /game)'
 
 servers:
@@ -26,6 +26,8 @@ channels:
         $ref: '#/components/messages/GameReady'
       send_chat:
         $ref: '#/components/messages/SendChat'
+      send_emoji:
+        $ref: '#/components/messages/SendEmoji'
       join_team:
         $ref: '#/components/messages/JoinTeam'
       leave_team:
@@ -66,6 +68,8 @@ channels:
         $ref: '#/components/messages/RoomInfo'
       chat_message:
         $ref: '#/components/messages/ChatMessage'
+      emoji_message:
+        $ref: '#/components/messages/EmojiMessage'
       room_config_updated:
         $ref: '#/components/messages/RoomConfigUpdated'
       game_started:
@@ -96,6 +100,7 @@ operations:
       - $ref: '#/channels/~1/messages/update_room_config'
       - $ref: '#/channels/~1/messages/game_ready'
       - $ref: '#/channels/~1/messages/send_chat'
+      - $ref: '#/channels/~1/messages/send_emoji'
       - $ref: '#/channels/~1/messages/join_team'
       - $ref: '#/channels/~1/messages/leave_team'
       - $ref: '#/channels/~1/messages/auto_fill'
@@ -117,6 +122,7 @@ operations:
       - $ref: '#/channels/~1/messages/user_left'
       - $ref: '#/channels/~1/messages/lobby_updated'
       - $ref: '#/channels/~1/messages/chat_message'
+      - $ref: '#/channels/~1/messages/emoji_message'
       - $ref: '#/channels/~1/messages/room_config_updated'
       - $ref: '#/channels/~1/messages/game_started'
       - $ref: '#/channels/~1/messages/change_phase'
@@ -220,6 +226,18 @@ components:
             type: string
             description: 채팅 내용
         required: [message]
+
+    SendEmoji:
+      name: send_emoji
+      title: 이모지 전송
+      summary: 이모지를 보낼 때 전송합니다. (번호만 전달)
+      payload:
+        type: object
+        properties:
+          emojiId:
+            type: number
+            description: 이모지 ID (숫자)
+        required: [emojiId]
 
     JoinTeam:
       name: join_team
@@ -453,6 +471,21 @@ components:
           isHost: { type: boolean, description: 방장 여부 }
           timestamp: { type: number, description: 전송 시간 }
 
+    EmojiMessage:
+      name: emoji_message
+      title: 이모지 수신
+      summary: 다른 유저가 전송한 이모지를 수신합니다.
+      payload:
+        type: object
+        properties:
+          senderId: { type: string, description: 보낸 유저 소켓 ID }
+          nickname: { type: string, description: 보낸 유저 닉네임 }
+          avatarId: { type: number, description: 아바타 ID }
+          team: { type: string, description: 팀 정보 (A/B/null) }
+          isHost: { type: boolean, description: 방장 여부 }
+          emojiId: { type: number, description: 이모지 ID }
+          timestamp: { type: number, description: 전송 시간 }
+
     RoomConfigUpdated:
       name: room_config_updated
       title: 방 설정 변경 알림
@@ -474,29 +507,29 @@ components:
 
     ChangePhase:
       name: change_phase
-      title: "?? ??? ??"
-      summary: "?? ??(??, ???, ?? ?)? ???? ????."
+      title: "페이즈 변경 알림"
+      summary: "게임 페이즈(대기/플레이/결과/종료)가 변경될 때 전송됩니다."
       payload:
         type: object
         properties:
           phase:
             type: string
-            description: "?? ?? ?? (displayStatus ?? status)"
+            description: "프론트 표시용 상태 (displayStatus ?? status)"
           data:
             type: object
             properties:
               duration:
                 type: number
-                description: "?? ??(ms)"
+                description: "지속 시간(ms)"
               startAt:
                 type: number
-                description: "?? ??"
+                description: "시작 시각"
               serverStatus:
                 type: string
-                description: "?? ??(WAITING/PLAYING/RESULTING/ENDED)"
+                description: "서버 상태(WAITING/PLAYING/RESULTING/ENDED)"
               roundName:
                 type: string
-                description: "?? ?? ??(?: TURN1)"
+                description: "표시용 라운드명(예: TURN1)"
     StoryUpdate:
       name: story_update
       title: 스토리 업데이트
