@@ -1,5 +1,54 @@
 ﻿import { RoomsGateway } from './rooms.gateway';
 
+describe('RoomsGateway.join_room', () => {
+  const roomsService = {
+    getRoomById: jest.fn(),
+    joinRoom: jest.fn(),
+    getUsersInRoom: jest.fn(),
+  };
+  const gamesService = {};
+  const aiJudgeService = {};
+
+  const socket: any = {
+    id: 'socket-1',
+    join: jest.fn(),
+    handshake: { headers: {}, address: '127.0.0.1' },
+  };
+
+  let gateway: RoomsGateway;
+  let emitSpy: jest.Mock;
+
+  beforeEach(() => {
+    emitSpy = jest.fn();
+    gateway = new RoomsGateway(
+      roomsService as unknown as any,
+      aiJudgeService as unknown as any,
+      gamesService as unknown as any,
+    );
+
+    (gateway as any).server = {
+      to: jest.fn().mockReturnValue({ emit: emitSpy }),
+    };
+  });
+
+  it('rejects join_room when game has already started', async () => {
+    roomsService.getRoomById.mockResolvedValue({ isStarted: true });
+
+    const result = await gateway.handleJoinRoom(socket, {
+      roomId: 'ROOM123',
+      nickname: 'user',
+      avatarId: 1,
+    } as any);
+
+    expect(result).toEqual({
+      status: 'error',
+      message: '게임이 이미 시작된 방에는 입장할 수 없습니다.',
+    });
+    expect(roomsService.joinRoom).not.toHaveBeenCalled();
+    expect(socket.join).not.toHaveBeenCalled();
+    expect(emitSpy).not.toHaveBeenCalled();
+  });
+});
 describe('RoomsGateway.submit_vote', () => {
   const roomsService = {
     getUserBySocket: jest.fn(),
