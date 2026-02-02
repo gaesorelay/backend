@@ -53,7 +53,7 @@ export class RoomsGateway {
 
     try {
       const room = await this.roomsService.getRoomById(data.roomId);
-      if (room.status !== 'WAITING') {
+      if (room.isStarted) {
         return { status: 'error', message: '게임이 이미 시작된 방에는 입장할 수 없습니다.' };
       }
       const clientIp = this.getClientIp(client);

@@ -1,4 +1,4 @@
-import { GameFlowService } from './game-flow.service';
+﻿import { GameFlowService } from './game-flow.service';
 import { RoomsRepository } from './rooms.repository';
 import { TimerService } from '../timer/timer.service';
 import { GamesService } from '../games/games.service';
@@ -31,6 +31,7 @@ describe('GameFlowService', () => {
   const room = {
     roomUuid,
     status: 'WAITING',
+      isStarted: false,
     config: {
       roundTime: 1,
       voteTime: 2,
