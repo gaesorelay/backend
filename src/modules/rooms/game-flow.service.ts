@@ -343,9 +343,10 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async buildAiJudgeScores(roomUuid: string): Promise<AiJudgeScore[] | null> {
-    // 스토리 제출 시 저장된 평가 입력이 없으면 AI 평가는 생략한다.
-    const teamAEvaluateDto = this.gamesService.getEvaluateDto(roomUuid, 'A');
-    const teamBEvaluateDto = this.gamesService.getEvaluateDto(roomUuid, 'B');
+    // Redis에서 데이터 조회 (await 사용)
+    const teamAEvaluateDto = await this.gamesService.getEvaluateDto(roomUuid, 'A');
+    const teamBEvaluateDto = await this.gamesService.getEvaluateDto(roomUuid, 'B');
+
     if (!teamAEvaluateDto || !teamBEvaluateDto) {
       return null;
     }
