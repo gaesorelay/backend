@@ -15,6 +15,7 @@ export interface Room {
   ownerUserToken: string;
   title: string;
   status: RoomStatus; // 위에서 정의한 WAITING | PLAYING | ENDED
+  isStarted: boolean;
   config: RoomConfig;
   createdAt: number;
 }

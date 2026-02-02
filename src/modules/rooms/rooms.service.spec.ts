@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+﻿import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { RoomsService } from './rooms.service';
 import { User } from '../users/types/user.type';
 import { Room } from './types/room.type';
@@ -232,6 +232,7 @@ describe('RoomsService.joinRoom', () => {
     ownerUserToken: 'owner-token',
     title: 'room',
     status: 'WAITING',
+      isStarted: false,
     config: {
       maxPlayers: 4,
       storytellerCount: 2,
@@ -397,6 +398,7 @@ describe('RoomsService.autoFillSlots', () => {
     ownerUserToken: 'owner-token',
     title: 'room',
     status: 'WAITING',
+      isStarted: false,
     config: {
       maxPlayers: 8,
       storytellerCount: 4,
