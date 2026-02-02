@@ -19,7 +19,7 @@ type GameFlowContext = {
   emitVoteResult?: (outcome: VoteOutcome) => void;
   nextAction?: () => void;
   currentStatus?: RoomStatus;
-  
+
   // ⭐️ [추가] 롤백을 위한 상태 추적
   currentTurn?: number; // 현재 턴 (PLAYING 시)
   subStatus?: 'CARD_SHUFFLE' | 'JUDGE_SHUFFLE' | 'STORY' | 'VOTING' | 'JUDGING';
@@ -119,7 +119,7 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
       // 예: 2턴 중단 -> 1턴만 남김 (index 0, 1 중 0만 남김) -> 길이는 1
       const prevTurn = currentTurn - 1;
       await this.gamesService.rollbackStory(roomUuid, prevTurn - 1);
-      
+
       const room = await this.roomsRepository.findById(roomUuid);
       const roundMs = (room?.config.roundTime ?? 60) * 1000;
 
@@ -157,7 +157,7 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
       // 하지만 startTurnFlow는 상태 변경 없이 PLAYING 유지 + emitStatus만 함
       // 따라서 DB 상태도 되돌려야 함
       await this.setRoomStatus(roomUuid, 'PLAYING');
-      
+
       await this.startTurnFlow(roomUuid, context, totalTurns, totalTurns, roundMs);
       return;
     }
@@ -186,7 +186,7 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
     // 방에 등록된 흐름 정보가 없으면 무시한다.
     const context = this.contexts.get(roomUuid);
     if (!context) return;
-    
+
     context.currentStatus = status; // 상태 갱신
 
     // 상태에 맞는 단계별 핸들러를 호출한다.
@@ -216,7 +216,7 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
 
     // 새 게임 시작 시 이전 투표 상태는 초기화한다.
     this.gamesService.resetVoteState(roomUuid);
-    
+
     context.subStatus = 'CARD_SHUFFLE';
     context.emitStatus('WAITING', CARD_SHUFFLE_TIME, 'CARD_SHUFFLE');
 
@@ -230,16 +230,10 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
   private async restartWaitingFromJudge(roomUuid: string, context: GameFlowContext) {
     context.subStatus = 'JUDGE_SHUFFLE';
     context.emitStatus('WAITING', JUDGE_SHUFFLE_TIME, 'JUDGE_SHUFFLE');
-    
-    this.scheduleNext(
-      roomUuid,
-      context,
-      'WAITING',
-      JUDGE_SHUFFLE_TIME,
-      () => {
-        void this.setRoomStatus(roomUuid, 'PLAYING');
-      },
-    );
+
+    this.scheduleNext(roomUuid, context, 'WAITING', JUDGE_SHUFFLE_TIME, () => {
+      void this.setRoomStatus(roomUuid, 'PLAYING');
+    });
   }
 
   private async handlePlaying(roomUuid: string, context: GameFlowContext): Promise<void> {
@@ -249,7 +243,7 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
     // 라운드 시간은 방 설정값을 사용한다.
     const roundMs = room.config.roundTime * 1000;
     const totalTurns = 8; // 고정값
-    
+
     context.totalTurns = totalTurns;
 
     this.startTurnFlow(roomUuid, context, 1, totalTurns, roundMs);
@@ -320,7 +314,7 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
     // PLAYING 상태는 유지하되, 사용자에게는 TURN 메시지로 안내한다.
     const displayStatus = `TURN${turnIndex}`;
     context.emitStatus('PLAYING', roundMs, displayStatus);
-    
+
     // 💡 [추가] 턴 시작 로직 호출 (이미지/순서 계산)
     await this.gamesService.startTurn(roomUuid, turnIndex);
 
@@ -344,7 +338,7 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
 
     // RoomStatus 업데이트 후 Subject로 상태 변경을 전파한다.
     room.status = status;
-    await this.roomsRepository.save(room);
+    await this.roomsRepository.save(room, 120);
     this.roomStatusSubject.notify({ roomUuid, status });
   }
 

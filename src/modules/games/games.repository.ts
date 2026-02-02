@@ -12,7 +12,7 @@ export class GamesRepository {
     const key = redisKeys.roomGameState(state.roomUuid);
 
     // 방 삭제 로직에서 이 키도 같이 지워줘야 함
-    await this.client.set(key, JSON.stringify(state), 'EX', 60 * 60 * 2);
+    await this.client.set(key, JSON.stringify(state), 'EX', 60 * 60);
   }
 
   async getGame(roomUuid: string): Promise<GameState | null> {

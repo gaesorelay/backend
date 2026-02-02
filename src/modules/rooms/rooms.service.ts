@@ -33,7 +33,7 @@ export class RoomsService {
       createdAt: Date.now(),
     };
 
-    const TTL_SECONDS = 60 * 60 * 12; // 12시간
+    const TTL_SECONDS = 60 * 60; // 1시간
     await this.roomsRepository.save(room, TTL_SECONDS);
 
     return {
