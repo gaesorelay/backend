@@ -227,24 +227,26 @@ export class RoomsGateway {
     }
   }
 
-  @SubscribeMessage('send_emoji')
-  async handleEmoji(@ConnectedSocket() client: Socket, @MessageBody() data: { emojiId: number }) {
+  @SubscribeMessage('send_reaction')
+  async handleReaction(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { emoji: string; nickname: string },
+  ) {
     try {
-      // 1. 소켓 ID로 유저 정보 조회
+      // 1. 소켓 ID로 현재 유저의 방 정보 조회
       const user = await this.roomsService.getUserBySocket(client.id);
+      if (!user) return;
 
-      // 2. 방 전체 브로드캐스트
-      this.server.to(user.roomUuid).emit('emoji_message', {
-        senderId: user.publicUserId,
-        nickname: user.nickname,
-        avatarId: user.avatarId,
-        emojiId: data.emojiId,
-        timestamp: Date.now(),
+      // 2. 해당 방 전체 유저에게 리액션 전달 (본인 포함 전원에게 띄우기 위해 server.to 사용)
+      // 만약 본인은 이미 triggerFloatingReaction을 실행했다면 client.broadcast.to를 써도 됩니다.
+      this.server.to(user.roomUuid).emit('receive_reaction', {
+        emoji: data.emoji,
+        nickname: data.nickname, // 누가 보냈는지 알 필요가 있다면 포함
       });
 
-      return { status: 'success' };
+      this.logger.log(`🎭 Reaction: ${data.nickname} sent ${data.emoji} in room ${user.roomUuid}`);
     } catch (error) {
-      return { status: 'error', message: '이모지 전송 실패' };
+      this.logger.error(`리액션 전송 실패: ${error.message}`);
     }
   }
 
