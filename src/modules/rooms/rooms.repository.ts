@@ -44,11 +44,9 @@ export class RoomsRepository {
   async saveUser(user: User): Promise<void> {
     const key = redisKeys.roomUser(user.roomUuid, user.userToken);
 
-    // 👇 [로그 추가] 저장할 때 어떤 키로 저장하는지 확인
-    // console.log(`💾 [Redis 저장] Key: ${key}`);
-
     // 동료 스타일처럼 JSON 문자열로 변환하여 저장
     await this.client.set(key, JSON.stringify(user));
+    await this.client.expire(key, 60 * 60); // 1시간 TTL 설정
   }
 
   async findUserTokenBySocketId(socketId: string): Promise<string | null> {
@@ -59,7 +57,19 @@ export class RoomsRepository {
 
   async nextPublicUserId(roomUuid: string): Promise<number> {
     const key = redisKeys.roomUserSeq(roomUuid);
-    return this.client.incr(key);
+    const results = await this.client
+      .pipeline()
+      .incr(key)
+      .expire(key, 60 * 60) // 1시간 TTL 설정
+      .exec();
+    if (!results) {
+      throw new Error('Redis pipeline failed to execute');
+    }
+    const [err, nextId] = results[0];
+    if (err) {
+      throw err;
+    }
+    return nextId as number;
   }
 
   // [수정] 소켓 매핑 저장: roomUuid와 userToken을 같이 저장
@@ -74,7 +84,7 @@ export class RoomsRepository {
     const key = `room:${roomUuid}:users`;
     await this.client.sadd(key, userToken);
     // 방 데이터랑 수명을 맞추기 위해 TTL 설정 (선택사항)
-    await this.client.expire(key, 60 * 60 * 12);
+    await this.client.expire(key, 60 * 60);
   }
 
   // 방명록에서 유저 토큰 제거 (퇴장 시)
