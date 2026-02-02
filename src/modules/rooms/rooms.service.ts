@@ -29,6 +29,7 @@ export class RoomsService {
       ownerUserToken: ownerToken,
       title: dto.title,
       status: 'WAITING', // LOBBY -> WAITING (프론트/백엔드 통일 권장)
+      isStarted: false,
       config: dto.config,
       createdAt: Date.now(),
     };
@@ -555,6 +556,9 @@ export class RoomsService {
       .map((u) => u.publicUserId.toString());
 
     console.log(`게임 시작 조건 만족! A: ${sortedTeamA}, B: ${sortedTeamB}`);
+
+    room.isStarted = true;
+    await this.roomsRepository.save(room, 60 * 60);
 
     // TODO: GameState DB 초기화 로직 (this.gameStateRepository.initGame...)
     // GameState 초기화 호출
