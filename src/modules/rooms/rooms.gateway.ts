@@ -23,6 +23,7 @@ import { WsThrottlerGuard } from '../../common/guards/ws-throttler.guard';
 import { GameFlowService } from './game-flow.service';
 import { UseFilters } from '@nestjs/common';
 import { WsExceptionFilter } from '@/common/filters/ws-exception.filter';
+import { UsePipes, ValidationPipe } from '@nestjs/common';
 
 @WebSocketGateway({
   namespace: 'game',
@@ -209,6 +210,7 @@ export class RoomsGateway {
   }
 
   @SubscribeMessage('send_chat')
+  @UsePipes(new ValidationPipe({ transform: true }))
   @UseGuards(WsThrottlerGuard)
   @SkipThrottle({ 'room-creation': true })
   @Throttle({ chat: { limit: 5, ttl: 10000, blockDuration: 10000 } })
@@ -290,18 +292,19 @@ export class RoomsGateway {
   }
 
   @SubscribeMessage('submit_story')
+  @UsePipes(new ValidationPipe({ transform: true }))
   @UseGuards(WsThrottlerGuard)
   @SkipThrottle({ 'room-creation': true })
   @Throttle({ chat: { limit: 5, ttl: 10000, blockDuration: 10000 } })
   async handleSubmitStory(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { text: string; team: 'A' | 'B'; userToken: string; turn: number },
+    @MessageBody() data: ChatDto & { team: 'A' | 'B'; userToken: string; turn: number },
   ) {
     try {
       const user = await this.roomsService.getUserBySocket(client.id);
       if (!user) throw new WsException('유저 세션 없음');
 
-      const clean = this.gamesService.convertToDogSound(data.text);
+      const clean = this.gamesService.convertToDogSound(data.message);
       await this.gamesService.submitStory(
         user.roomUuid,
         data.userToken,
