@@ -90,6 +90,10 @@ pipeline {
                 string(
                   credentialsId: 'deploy-server-ip',
                   variable: 'DEPLOY_SERVER_IP'
+                ),
+                string(
+                  credentialsId: 'gms-api-key',
+                  variable: 'GMS_API_KEY'
                 )
               ]) {
                 sh """
@@ -108,7 +112,7 @@ pipeline {
                     echo "${REG_PASS}" | docker login docker.io -u "${REG_USER}" --password-stdin
 
                     BACKEND_IMAGE="${IMAGE_NAME}" BACKEND_TAG="${env.TAG}" docker compose pull backend
-                    BACKEND_IMAGE="${IMAGE_NAME}" BACKEND_TAG="${env.TAG}" docker compose up -d --no-deps backend
+                    BACKEND_IMAGE="${IMAGE_NAME}" BACKEND_TAG="${env.TAG}" GMS_API_KEY="${GMS_API_KEY}" docker compose up -d --no-deps backend
 
                     docker image prune -f
                   '
