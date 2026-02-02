@@ -30,16 +30,16 @@ import { ThrottlerModule } from '@nestjs/throttler';
     GamesModule,
     ThrottlerModule.forRoot([
       {
-        // 1. 방 생성 규칙 (이름: 'room-creation')
         name: 'room-creation',
-        ttl: 60000, // 1분 (밀리초 단위)
-        limit: 3, // 3회
+        ttl: 60000,
+        limit: 3,
+        blockDuration: 60000,
       },
       {
-        // 2. 채팅 규칙 (이름: 'chat')
         name: 'chat',
-        ttl: 1000, // 1초
-        limit: 5, // 5회
+        ttl: 1000,
+        limit: 5,
+        blockDuration: 1000,
       },
     ]),
   ],

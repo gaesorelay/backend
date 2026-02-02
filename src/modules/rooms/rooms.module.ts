@@ -8,9 +8,10 @@ import { GamesModule } from '../games/games.module';
 import { TimerModule } from '../timer/timer.module';
 import { GameFlowService } from './game-flow.service';
 import { RoomStatusSubject } from './room-status.subject';
+import { ThrottlerModule } from '@nestjs/throttler';
 
 @Module({
-  imports: [forwardRef(() => AiJudgeModule), GamesModule, TimerModule],
+  imports: [forwardRef(() => AiJudgeModule), GamesModule, TimerModule, ThrottlerModule],
   controllers: [RoomsController],
   providers: [RoomsService, RoomsRepository, RoomsGateway, GameFlowService, RoomStatusSubject],
   exports: [RoomsService],
