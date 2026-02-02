@@ -31,6 +31,7 @@ services:
       PORT: 8000
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      GMS_API_KEY: ${GMS_API_KEY}
     expose:
       - '8000'
     depends_on:
