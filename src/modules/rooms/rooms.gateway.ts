@@ -52,6 +52,10 @@ export class RoomsGateway {
     this.logger.log(`join_room 요청: 방 ${data.roomId}, 닉네임 ${data.nickname}`);
 
     try {
+      const room = await this.roomsService.getRoomById(data.roomId);
+      if (room.status !== 'WAITING') {
+        return { status: 'error', message: '게임이 이미 시작된 방에는 입장할 수 없습니다.' };
+      }
       const clientIp = this.getClientIp(client);
       const user: User = await this.roomsService.joinRoom(
         data.roomId,
