@@ -43,7 +43,7 @@ export class RoomsGateway {
     private readonly aiJudgeService: AiJudgeService,
     private readonly gamesService: GamesService,
     private readonly gameFlowService: GameFlowService,
-  ) {}
+  ) { }
 
   /**
    * 1. 방 입장 (Setup -> GameRoom 진입)
@@ -536,6 +536,26 @@ export class RoomsGateway {
   }
 
   // AI 투표 반영은 RESULTING 시작 시점에 내부 로직으로 처리
+
+  @SubscribeMessage('restart_game')
+  async handleRestartGame(@ConnectedSocket() client: Socket) {
+    this.logger.log(`restart_game 요청: ${client.id}`);
+    try {
+      const { roomUuid, users } = await this.roomsService.restartGame(client.id);
+
+      // 1. 유저 상태(Ready 해제 등) 업데이트 알림
+      this.server.to(roomUuid).emit('lobby_updated', {
+        users,
+      });
+
+      // 2. 페이즈를 LOBBY(백엔드 WAITING)로 전환
+      this.emitPhase(roomUuid, 'WAITING', 0, 'LOBBY');
+
+      return { status: 'success' };
+    } catch (error) {
+      return { status: 'error', message: error.message };
+    }
+  }
 
   /**
    * 6. 유저 강퇴 (방장만 가능)

@@ -315,7 +315,7 @@ private async sendVoteResult(roomUuid: string, context: GameFlowContext) {
 // 기존 handleEnded는 단순히 상태 정리만 하도록 축소
 private async handleEnded(roomUuid: string, context: GameFlowContext): Promise<void> {
   // 이미 결과는 보냈으니 상태 정리만 수행
-  context.emitStatus('ENDED', 0, 'FINAL_RESULT');
+  context.emitStatus('ENDED', 0, 'JUDGE_RESULT');
   this.gamesService.resetVoteState(roomUuid);
   this.aiVotePromises.delete(roomUuid);
   this.contexts.delete(roomUuid);
