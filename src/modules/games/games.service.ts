@@ -6,6 +6,7 @@ import { EvaluateSubmissionDto } from '../ai-judges/dto/judge.dto';
 import { AiJudgeScore, TeamSide, VoteOutcome } from './types/vote-outcome.type';
 import { Server } from 'socket.io';
 import Filter from 'badwords-ko';
+import { TURN_COUNT } from '../../common/constants/game-flow.constants';
 
 @Injectable()
 export class GamesService {
@@ -69,7 +70,7 @@ export class GamesService {
   }
 
   /**
-   * 🎲 [신규] 랜덤 이미지 8개 선정 및 저장
+   * 🎲 [신규] 랜덤 이미지 TURN_COUNT개 선정 및 저장
    */
   async selectAndSaveImages(roomUuid: string): Promise<number[]> {
     // 1. 전체 이미지 목록 복사 (원본 보호)
@@ -81,8 +82,8 @@ export class GamesService {
       [allImages[i], allImages[j]] = [allImages[j], allImages[i]];
     }
 
-    // 3. 앞에서 8개 자르기
-    const selectedImages = allImages.slice(0, 8);
+    // 3. 앞에서 TURN_COUNT개 자르기
+    const selectedImages = allImages.slice(0, TURN_COUNT);
 
     // 4. ID만 추출
     const imageIds = selectedImages.map((img) => img.id);
@@ -90,7 +91,7 @@ export class GamesService {
     // 5. Repository 호출하여 저장
     await this.gamesRepository.updateGameImages(roomUuid, imageIds);
 
-    console.log(`🖼️ [Game] 방 ${roomUuid} 이미지 8개 선정 완료: ${imageIds}`);
+    console.log(`🖼️ [Game] 방 ${roomUuid} 이미지 ${TURN_COUNT}개 선정 완료: ${imageIds}`);
     return imageIds;
   }
 

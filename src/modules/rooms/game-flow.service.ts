@@ -12,6 +12,7 @@ import {
   JUDGE_SHUFFLE_TIME,
   JUDGING_TIME,
   STORY_TIME,
+  TURN_COUNT,
 } from '../../common/constants/game-flow.constants';
 
 type GameFlowContext = {
@@ -124,7 +125,7 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
       const roundMs = (room?.config.roundTime ?? 60) * 1000;
 
       // 이전 턴 시작
-      await this.startTurnFlow(roomUuid, context, prevTurn, context.totalTurns || 8, roundMs);
+      await this.startTurnFlow(roomUuid, context, prevTurn, context.totalTurns || TURN_COUNT, roundMs);
       return;
     }
 
@@ -142,13 +143,13 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
     }
 
     // RESULTING 상태
-    // 스토리/투표 중이면 -> 마지막 턴(8턴)으로 복귀
+    // 스토리/투표 중이면 -> 마지막 턴으로 복귀
     if (context.currentStatus === 'RESULTING' || context.currentStatus === 'ENDED') {
       const room = await this.roomsRepository.findById(roomUuid);
       const roundMs = (room?.config?.roundTime ?? 60) * 1000;
-      const totalTurns = 8;
+      const totalTurns = TURN_COUNT;
 
-      // 7턴까지 남기고(길이 7) -> 8턴 시작
+      // 마지막 턴 이전까지 남기고 -> 마지막 턴 시작
       await this.gamesService.rollbackStory(roomUuid, totalTurns - 1);
 
       // 다시 PLAYING 상태로 강제 변경 필요
@@ -242,7 +243,7 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
 
     // 라운드 시간은 방 설정값을 사용한다.
     const roundMs = room.config.roundTime * 1000;
-    const totalTurns = 8; // 고정값
+    const totalTurns = TURN_COUNT; // 고정값
 
     context.totalTurns = totalTurns;
 
