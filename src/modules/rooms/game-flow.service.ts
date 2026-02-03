@@ -290,12 +290,12 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
     context.subStatus = 'STORY';
     context.emitStatus('RESULTING', STORY_TIME, 'STORY');
 
-    // AI 평가 요청 (비동기 시작)
-    const aiVotesPromise = this.buildAiJudgeScores(roomUuid);
-    this.aiVotePromises.set(roomUuid, aiVotesPromise);
-
     // 2. STORY -> VOTING
     this.scheduleNext(roomUuid, context, 'RESULTING', STORY_TIME, () => {
+      // ⭐️ [이동] AI 평가 요청을 VOTING 시작 시점으로 변경 (데이터 저장 안전 확보)
+      const aiVotesPromise = this.buildAiJudgeScores(roomUuid);
+      this.aiVotePromises.set(roomUuid, aiVotesPromise);
+
       const votingMs = room.config.voteTime * 1000;
       context.subStatus = 'VOTING';
       context.emitStatus('RESULTING', votingMs, 'VOTING');
