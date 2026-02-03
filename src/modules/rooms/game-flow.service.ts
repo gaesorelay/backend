@@ -190,10 +190,35 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  /**
+   * 🛑 게임 흐름 강제 종료 (Play Again 시 호출)
+   * - 타이머 취소 및 컨텍스트 제거
+   */
+  async resetFlow(roomUuid: string) {
+    const context = this.contexts.get(roomUuid);
+    if (!context) return;
+
+    // 1. 실행 중인 타이머 취소
+    if (context.currentStatus) {
+      this.timerService.cancel(roomUuid, context.currentStatus);
+    }
+
+    // 2. 컨텍스트 및 AI 요청 제거
+    this.contexts.delete(roomUuid);
+    this.aiVotePromises.delete(roomUuid);
+
+    this.logger.log(`[resetFlow] Game flow reset for room ${roomUuid}`);
+  }
+
   private async handleStatusChange(roomUuid: string, status: RoomStatus): Promise<void> {
     // 방에 등록된 흐름 정보가 없으면 무시한다.
     const context = this.contexts.get(roomUuid);
     if (!context) return;
+
+    // ⭐️ [중요] 상태 변경 시 기존 타이머 취소 보장
+    if (context.currentStatus && context.currentStatus !== status) {
+      this.timerService.cancel(roomUuid, context.currentStatus);
+    }
 
     context.currentStatus = status; // 상태 갱신
 
