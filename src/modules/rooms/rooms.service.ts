@@ -618,6 +618,9 @@ export class RoomsService {
     const room = await this.roomsRepository.findById(roomUuid);
     const users = await this.roomsRepository.getUsersInRoom(roomUuid);
 
+    // ⭐️ [추가] 이전 게임 흐름(타이머 등) 강제 종료
+    await this.gameFlowService.resetFlow(roomUuid);
+
     // 1. 방 상태 초기화
     room.isStarted = false;
     room.status = 'WAITING'; // LOBBY 상태
