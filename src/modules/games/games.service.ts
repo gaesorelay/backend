@@ -332,6 +332,7 @@ export class GamesService {
 
     // 임시 필터를 하나 만들어서 처리 (또는 생성자에서 설정)
     const tempFilter = new Filter({ placeHolder: '§' });
+    tempFilter.addWords('야옹', '애옹', '고양이', '냥냥', '냐옹', '냥이');
     const masked = tempFilter.clean(text);
 
     // 2. '§' 가 나올 때마다 랜덤 개소리로 교체합니다.
