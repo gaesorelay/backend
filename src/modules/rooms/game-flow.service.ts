@@ -1,4 +1,4 @@
-﻿import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+﻿import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { RoomsRepository } from './rooms.repository';
 import { RoomStatus } from './types/room.type';
 import { TimerService } from '../timer/timer.service';
@@ -29,6 +29,7 @@ type GameFlowContext = {
 
 @Injectable()
 export class GameFlowService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(GameFlowService.name);
   // 방별 게임 흐름에 필요한 콜백을 보관한다.
   private readonly contexts = new Map<string, GameFlowContext>();
   // RESULTING 단계에서 시작한 AI 평가 Promise를 보관한다.
@@ -125,7 +126,13 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
       const roundMs = (room?.config.roundTime ?? 60) * 1000;
 
       // 이전 턴 시작
-      await this.startTurnFlow(roomUuid, context, prevTurn, context.totalTurns || TURN_COUNT, roundMs);
+      await this.startTurnFlow(
+        roomUuid,
+        context,
+        prevTurn,
+        context.totalTurns || TURN_COUNT,
+        roundMs,
+      );
       return;
     }
 
@@ -251,76 +258,76 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async handleVoting(roomUuid: string, context: GameFlowContext): Promise<void> {
-  const room = await this.roomsRepository.findById(roomUuid);
-  if (!room) return;
+    const room = await this.roomsRepository.findById(roomUuid);
+    if (!room) return;
 
-  // 1. STORY 단계
-  context.subStatus = 'STORY';
-  context.emitStatus('RESULTING', STORY_TIME, 'STORY');
+    // 1. STORY 단계
+    context.subStatus = 'STORY';
+    context.emitStatus('RESULTING', STORY_TIME, 'STORY');
 
-  // AI 평가 요청 (비동기 시작)
-  const aiVotesPromise = this.buildAiJudgeScores(roomUuid);
-  this.aiVotePromises.set(roomUuid, aiVotesPromise);
+    // AI 평가 요청 (비동기 시작)
+    const aiVotesPromise = this.buildAiJudgeScores(roomUuid);
+    this.aiVotePromises.set(roomUuid, aiVotesPromise);
 
-  // 2. STORY -> VOTING
-  this.scheduleNext(roomUuid, context, 'RESULTING', STORY_TIME, () => {
-    const votingMs = room.config.voteTime * 1000;
-    context.subStatus = 'VOTING';
-    context.emitStatus('RESULTING', votingMs, 'VOTING');
+    // 2. STORY -> VOTING
+    this.scheduleNext(roomUuid, context, 'RESULTING', STORY_TIME, () => {
+      const votingMs = room.config.voteTime * 1000;
+      context.subStatus = 'VOTING';
+      context.emitStatus('RESULTING', votingMs, 'VOTING');
 
-    // 3. VOTING -> JUDGE_RESULT (✨ 여기서 결과 전송!)
-    this.scheduleNext(roomUuid, context, 'RESULTING', votingMs, async () => {
-      // ⭐️ [중요] JUDGE_RESULT 페이즈 시작 알림
-      context.subStatus = 'JUDGE_RESULT';
-      context.emitStatus('RESULTING', JUDGING_TIME, 'JUDGE_RESULT');
+      // 3. VOTING -> JUDGE_RESULT (✨ 여기서 결과 전송!)
+      this.scheduleNext(roomUuid, context, 'RESULTING', votingMs, async () => {
+        // ⭐️ [중요] JUDGE_RESULT 페이즈 시작 알림
+        context.subStatus = 'JUDGE_RESULT';
+        context.emitStatus('RESULTING', JUDGING_TIME, 'JUDGE_RESULT');
 
-      // ⭐️ [중요] AI 결과 및 투표 집계 후 클라이언트로 전송
-      await this.sendVoteResult(roomUuid, context);
+        // ⭐️ [중요] AI 결과 및 투표 집계 후 클라이언트로 전송
+        await this.sendVoteResult(roomUuid, context);
 
-      // 4. JUDGE_RESULT -> ENDED
-      this.scheduleNext(roomUuid, context, 'RESULTING', JUDGING_TIME, () => {
-        void this.setRoomStatus(roomUuid, 'ENDED');
+        // 4. JUDGE_RESULT -> ENDED
+        this.scheduleNext(roomUuid, context, 'RESULTING', JUDGING_TIME, () => {
+          void this.setRoomStatus(roomUuid, 'ENDED');
+        });
       });
     });
-  });
-}
-
-// ✨ 새로 분리한 결과 전송 메서드 (handleEnded에서 로직 가져옴)
-private async sendVoteResult(roomUuid: string, context: GameFlowContext) {
-  // 1. AI 평가 결과 대기 (이미 요청해둔 것)
-  const aiVotesPromise = this.aiVotePromises.get(roomUuid);
-  const aiScores = aiVotesPromise ? await aiVotesPromise : null;
-
-  // 2. 관객 투표 결과 집계
-  let outcome = this.gamesService.getVoteOutcome(roomUuid);
-
- if (aiScores && aiScores.length > 0) {
-    console.log(`\n🤖 [AI 심사 결과 - Room ${roomUuid}]`);
-    aiScores.forEach((s) => {
-      console.log(`   [${s.judgeName}] A: ${s.scoreTeamA} / B: ${s.scoreTeamB}`);
-    });
-
-    // 1. 함수 실행
-    outcome = this.gamesService.applyAiJudgeVotes(roomUuid, aiScores);
-    
-    // 🔍 [디버깅] 여기서 찍었을 때 aiJudges가 들어있나요?
-    console.log("🔥 [DEBUG] 최종 outcome 데이터 확인:", JSON.stringify(outcome, null, 2));
   }
 
-  if (context.emitVoteResult) {
-    // 2. 전송
-    context.emitVoteResult(outcome);
-  }
-}
+  // ✨ 새로 분리한 결과 전송 메서드 (handleEnded에서 로직 가져옴)
+  private async sendVoteResult(roomUuid: string, context: GameFlowContext) {
+    // 1. AI 평가 결과 대기 (이미 요청해둔 것)
+    const aiVotesPromise = this.aiVotePromises.get(roomUuid);
+    const aiScores = aiVotesPromise ? await aiVotesPromise : null;
 
-// 기존 handleEnded는 단순히 상태 정리만 하도록 축소
-private async handleEnded(roomUuid: string, context: GameFlowContext): Promise<void> {
-  // 이미 결과는 보냈으니 상태 정리만 수행
-  context.emitStatus('ENDED', 0, 'JUDGE_RESULT');
-  this.gamesService.resetVoteState(roomUuid);
-  this.aiVotePromises.delete(roomUuid);
-  this.contexts.delete(roomUuid);
-}
+    // 2. 관객 투표 결과 집계
+    let outcome = this.gamesService.getVoteOutcome(roomUuid);
+
+    if (aiScores && aiScores.length > 0) {
+      console.log(`\n🤖 [AI 심사 결과 - Room ${roomUuid}]`);
+      aiScores.forEach((s) => {
+        console.log(`   [${s.judgeName}] A: ${s.scoreTeamA} / B: ${s.scoreTeamB}`);
+      });
+
+      // 1. 함수 실행
+      outcome = this.gamesService.applyAiJudgeVotes(roomUuid, aiScores);
+
+      // 🔍 [디버깅] 여기서 찍었을 때 aiJudges가 들어있나요?
+      console.log('🔥 [DEBUG] 최종 outcome 데이터 확인:', JSON.stringify(outcome, null, 2));
+    }
+
+    if (context.emitVoteResult) {
+      // 2. 전송
+      context.emitVoteResult(outcome);
+    }
+  }
+
+  // 기존 handleEnded는 단순히 상태 정리만 하도록 축소
+  private async handleEnded(roomUuid: string, context: GameFlowContext): Promise<void> {
+    // 이미 결과는 보냈으니 상태 정리만 수행
+    context.emitStatus('ENDED', 0, 'FINAL_RESULT');
+    this.gamesService.resetVoteState(roomUuid);
+    this.aiVotePromises.delete(roomUuid);
+    this.contexts.delete(roomUuid);
+  }
   private async startTurnFlow(
     roomUuid: string,
     context: GameFlowContext,
@@ -328,6 +335,9 @@ private async handleEnded(roomUuid: string, context: GameFlowContext): Promise<v
     totalTurns: number,
     roundMs: number,
   ): Promise<void> {
+    this.logger.log(
+      `[startTurnFlow] room=${roomUuid} turn=${turnIndex}/${totalTurns} roundMs=${roundMs}`,
+    );
     // Context에 현재 턴 저장
     context.currentTurn = turnIndex;
 
@@ -375,13 +385,14 @@ private async handleEnded(roomUuid: string, context: GameFlowContext): Promise<v
     console.time(`⏱️ AI Evaluation Time (${roomUuid})`);
     console.log(`🚀 Sending AI Request for Team A... (Room: ${roomUuid})`);
     console.log(`🚀 Sending AI Request for Team B... (Room: ${roomUuid})`);
-    
+
     const startTime = Date.now();
 
     return Promise.all([
       this.aiJudgeService.evaluateRoom(roomUuid, teamAEvaluateDto),
       this.aiJudgeService.evaluateRoom(roomUuid, teamBEvaluateDto),
-    ]).then(([teamAResults, teamBResults]) => {
+    ])
+      .then(([teamAResults, teamBResults]) => {
         const duration = Date.now() - startTime;
         console.timeEnd(`⏱️ AI Evaluation Time (${roomUuid})`);
         console.log(`✅ AI Evaluation Completed in ${duration}ms`);
@@ -405,9 +416,10 @@ private async handleEnded(roomUuid: string, context: GameFlowContext): Promise<v
             } as AiJudgeScore;
           })
           .filter((result): result is AiJudgeScore => result !== null);
-    }).catch(error => {
+      })
+      .catch((error) => {
         console.error(`❌ AI Evaluation Failed:`, error);
         return null;
-    });
+      });
   }
 }
