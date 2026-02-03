@@ -9,6 +9,7 @@ import {
   JUDGE_SHUFFLE_TIME,
   JUDGING_TIME,
   STORY_TIME,
+  TURN_COUNT,
 } from '../../common/constants/game-flow.constants';
 
 const flushPromises = async () => {
@@ -37,7 +38,7 @@ describe('GameFlowService', () => {
       voteTime: 2,
       maxPlayers: 8,
       storytellerCount: 4,
-      rounds: 8,
+      rounds: TURN_COUNT,
     },
   };
 
@@ -114,21 +115,20 @@ describe('GameFlowService', () => {
     const voteMs = room.config.voteTime * 1000;
 
     // 서버가 보내야 하는 phase 순서와 지속시간을 고정 배열로 정의한다.
+    const expectedTurns = Array.from({ length: TURN_COUNT }, (_, index) => [
+      'PLAYING',
+      roundMs,
+      `TURN${index + 1}`,
+    ]) as Array<[string, number, string?]>;
+
     const expected: Array<[string, number, string?]> = [
       ['WAITING', CARD_SHUFFLE_TIME, 'CARD_SHUFFLE'],
       ['WAITING', JUDGE_SHUFFLE_TIME, 'JUDGE_SHUFFLE'],
-      ['PLAYING', roundMs, 'TURN1'],
-      ['PLAYING', roundMs, 'TURN2'],
-      ['PLAYING', roundMs, 'TURN3'],
-      ['PLAYING', roundMs, 'TURN4'],
-      ['PLAYING', roundMs, 'TURN5'],
-      ['PLAYING', roundMs, 'TURN6'],
-      ['PLAYING', roundMs, 'TURN7'],
-      ['PLAYING', roundMs, 'TURN8'],
+      ...expectedTurns,
       ['RESULTING', STORY_TIME, 'STORY'],
       ['RESULTING', voteMs, 'VOTING'],
       ['RESULTING', JUDGING_TIME, 'JUDGE_RESULT'],
-      ['ENDED', 0, 'JUDGE_RESULT'],
+      ['ENDED', 0, 'FINAL_RESULT'],
     ];
 
     // 실제 emit된 status 호출을 [status, duration, displayStatus] 형태로 추출한다.
