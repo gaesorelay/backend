@@ -18,7 +18,7 @@ export class RoomsService {
     private readonly gamesService: GamesService,
     private readonly gameFlowService: GameFlowService,
     private readonly roomStatusSubject: RoomStatusSubject,
-  ) {}
+  ) { }
 
   async createRoom(dto: CreateRoomDto): Promise<CreateRoomResponseDto> {
     const roomUuid = generateRoomId();
@@ -597,5 +597,44 @@ export class RoomsService {
     if (!user) throw new NotFoundException('User not found');
 
     return user;
+  }
+
+  /**
+   * 🔄 게임 재시작 (방장 전용)
+   * - 방 상태를 WAITING으로, isStarted를 false로 초기화
+   * - 모든 유저의 Ready 상태 해제
+   */
+  async restartGame(socketId: string) {
+    const mapping = await this.roomsRepository.getMappingBySocketId(socketId);
+    if (!mapping) throw new NotFoundException();
+
+    const requester = await this.roomsRepository.findUserByToken(
+      mapping.roomUuid,
+      mapping.userToken,
+    );
+    if (!requester.isHost) throw new BadRequestException('방장만 재시작할 수 있습니다.');
+
+    const roomUuid = mapping.roomUuid;
+    const room = await this.roomsRepository.findById(roomUuid);
+    const users = await this.roomsRepository.getUsersInRoom(roomUuid);
+
+    // 1. 방 상태 초기화
+    room.isStarted = false;
+    room.status = 'WAITING'; // LOBBY 상태
+    await this.roomsRepository.save(room, 60 * 60);
+
+    // 2. 유저 Ready 초기화
+    const resetUsers: User[] = [];
+    for (const user of users) {
+      if (user.isReady) {
+        user.isReady = false;
+        await this.roomsRepository.saveUser(user);
+      }
+      resetUsers.push(user);
+    }
+
+    // 3. 게임 관련 데이터 초기화 (선택 사항: 투표 등은 이미 GameFlowService.handleEnded에서 정리됨)
+
+    return { roomUuid, users: resetUsers };
   }
 }
