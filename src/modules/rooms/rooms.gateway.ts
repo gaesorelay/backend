@@ -476,7 +476,7 @@ export class RoomsGateway {
       // Service에서 조건 검증 후 게임 시작 처리
       const { roomUuid } = await this.roomsService.startGame(client.id);
 
-      // 이미지 8개 랜덤 선정 및 저장
+      // 이미지 TURN_COUNT개 랜덤 선정 및 저장
       const imageIds = await this.gamesService.selectAndSaveImages(roomUuid);
 
       // 심사위원 선정
