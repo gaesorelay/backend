@@ -335,21 +335,22 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
     totalTurns: number,
     roundMs: number,
   ): Promise<void> {
+    const effectiveRoundMs = turnIndex === 1 ? roundMs + 3000 : roundMs;
     this.logger.log(
-      `[startTurnFlow] room=${roomUuid} turn=${turnIndex}/${totalTurns} roundMs=${roundMs}`,
+      `[startTurnFlow] room=${roomUuid} turn=${turnIndex}/${totalTurns} roundMs=${effectiveRoundMs}`,
     );
     // Context에 현재 턴 저장
     context.currentTurn = turnIndex;
 
     // PLAYING 상태는 유지하되, 사용자에게는 TURN 메시지로 안내한다.
     const displayStatus = `TURN${turnIndex}`;
-    context.emitStatus('PLAYING', roundMs, displayStatus);
+    context.emitStatus('PLAYING', effectiveRoundMs, displayStatus);
 
     // 💡 [추가] 턴 시작 로직 호출 (이미지/순서 계산)
     await this.gamesService.startTurn(roomUuid, turnIndex);
 
     // 3. 타이머 스케줄링
-    this.scheduleNext(roomUuid, context, 'PLAYING', roundMs, async () => {
+    this.scheduleNext(roomUuid, context, 'PLAYING', effectiveRoundMs, async () => {
       // 4. ⭐️ [추가] 턴 종료 처리 (버퍼 -> 스토리 저장)
       await this.gamesService.endTurn(roomUuid);
 

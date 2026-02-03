@@ -115,11 +115,11 @@ describe('GameFlowService', () => {
     const voteMs = room.config.voteTime * 1000;
 
     // 서버가 보내야 하는 phase 순서와 지속시간을 고정 배열로 정의한다.
-    const expectedTurns = Array.from({ length: TURN_COUNT }, (_, index) => [
-      'PLAYING',
-      roundMs,
-      `TURN${index + 1}`,
-    ]) as Array<[string, number, string?]>;
+    const expectedTurns = Array.from({ length: TURN_COUNT }, (_, index) => {
+      const turnNumber = index + 1;
+      const duration = turnNumber === 1 ? roundMs + 3000 : roundMs;
+      return ['PLAYING', duration, `TURN${turnNumber}`] as [string, number, string?];
+    });
 
     const expected: Array<[string, number, string?]> = [
       ['WAITING', CARD_SHUFFLE_TIME, 'CARD_SHUFFLE'],
@@ -128,7 +128,7 @@ describe('GameFlowService', () => {
       ['RESULTING', STORY_TIME, 'STORY'],
       ['RESULTING', voteMs, 'VOTING'],
       ['RESULTING', JUDGING_TIME, 'JUDGE_RESULT'],
-      ['ENDED', 0, 'JUDGE_RESULT'],
+      ['ENDED', 0, 'FINAL_RESULT'],
     ];
 
     // 실제 emit된 status 호출을 [status, duration, displayStatus] 형태로 추출한다.
