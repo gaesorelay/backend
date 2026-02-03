@@ -71,7 +71,6 @@ describe('GameFlowService', () => {
       }),
       applyAiJudgeVotes: jest.fn(),
       getEvaluateDto: jest.fn().mockReturnValue(null),
-      endTurn: jest.fn().mockResolvedValue(undefined),
       startTurn: jest.fn().mockResolvedValue({
         turn: 1,
         imageId: 1,

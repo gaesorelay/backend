@@ -269,40 +269,6 @@ export class GamesService {
   }
 
   /**
-   * 🛑 [턴 종료] 타이머에 의해 강제로 턴이 끝남
-   * - 버퍼 저장이 아니라, "혹시 제출 안 한 팀이 있나?" 확인해서 땜빵 처리
-   */
-  async endTurn(roomUuid: string) {
-    const state = await this.gamesRepository.getGame(roomUuid);
-    if (!state) return;
-
-    // A팀 확인: 이번 라운드에 제출했나?
-    // startTurn에서 설정한 turnIndex(현재 라운드)와 스토리 개수를 비교
-    // 하지만 여기선 간단하게 "A팀 스토리 개수 vs B팀 스토리 개수" 비교로 처리 가능
-    // 혹은 "현재 진행중이어야 할 라운드 수"를 기준으로 판단.
-
-    // 예: 현재 3라운드(turnIndex=3)가 끝나야 함.
-    // 근데 storyA.length가 2개다? -> A팀 제출 안 함 -> 빈 문자열 강제 추가.
-
-    // (편의상 A/B 길이를 맞추는 로직 사용)
-    const maxLen = Math.max(state.teamAStory.length, state.teamBStory.length);
-
-    // 사실 maxLen보다는 "현재 라운드 수"가 기준이 되어야 합니다.
-    // 하지만 여기서는 간단히 "상대방보다 적으면 채워넣기" 로직 예시:
-    if (state.teamAStory.length < maxLen) {
-      state.teamAStory.push('(시간 초과)');
-    }
-    if (state.teamBStory.length < maxLen) {
-      state.teamBStory.push('(시간 초과)');
-    }
-
-    // 만약 둘 다 안 냈을 수도 있으니,
-    // 원래는 turnIndex를 인자로 받아서 story.length < turnIndex 면 push 하는 게 정확함.
-
-    await this.gamesRepository.saveGame(state);
-  }
-
-  /**
    * ⏪ [롤백] 스토리를 특정 라운드까지만 남기고 자른다.
    * targetRoundIndex: 되돌아갈 라운드 번호 (예: 2턴으로 돌아가려면 -> 1 (0, 1 인덱스만 남김))
    * 즉, targetRoundIndex 길이만큼만 남기고 나머지는 버림
