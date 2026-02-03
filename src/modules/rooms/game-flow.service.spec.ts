@@ -31,7 +31,7 @@ describe('GameFlowService', () => {
   const room = {
     roomUuid,
     status: 'WAITING',
-      isStarted: false,
+    isStarted: false,
     config: {
       roundTime: 1,
       voteTime: 2,
@@ -128,7 +128,7 @@ describe('GameFlowService', () => {
       ['RESULTING', STORY_TIME, 'STORY'],
       ['RESULTING', voteMs, 'VOTING'],
       ['RESULTING', JUDGING_TIME, 'JUDGE_RESULT'],
-      ['ENDED', 0, 'FINAL_RESULT'],
+      ['ENDED', 0, 'JUDGE_RESULT'],
     ];
 
     // 실제 emit된 status 호출을 [status, duration, displayStatus] 형태로 추출한다.
