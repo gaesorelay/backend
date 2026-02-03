@@ -376,9 +376,6 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
 
     // 3. 타이머 스케줄링
     this.scheduleNext(roomUuid, context, 'PLAYING', effectiveRoundMs, async () => {
-      // 4. ⭐️ [추가] 턴 종료 처리 (버퍼 -> 스토리 저장)
-      await this.gamesService.endTurn(roomUuid);
-
       // 다음 턴인지 투표인지 결정
       if (turnIndex < totalTurns) {
         await this.startTurnFlow(roomUuid, context, turnIndex + 1, totalTurns, roundMs);
