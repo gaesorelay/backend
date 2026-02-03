@@ -42,7 +42,7 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
     private readonly gamesService: GamesService,
     private readonly aiJudgeService: AiJudgeService,
     private readonly roomStatusSubject: RoomStatusSubject,
-  ) {}
+  ) { }
 
   onModuleInit() {
     // RoomStatusSubject를 구독해서 상태 변화마다 로직이 이어지도록 한다.
@@ -323,7 +323,7 @@ export class GameFlowService implements OnModuleInit, OnModuleDestroy {
   // 기존 handleEnded는 단순히 상태 정리만 하도록 축소
   private async handleEnded(roomUuid: string, context: GameFlowContext): Promise<void> {
     // 이미 결과는 보냈으니 상태 정리만 수행
-    context.emitStatus('ENDED', 0, 'FINAL_RESULT');
+    context.emitStatus('ENDED', 0, 'JUDGE_RESULT');
     this.gamesService.resetVoteState(roomUuid);
     this.aiVotePromises.delete(roomUuid);
     this.contexts.delete(roomUuid);
