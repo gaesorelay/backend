@@ -21,6 +21,48 @@ export class GamesRepository {
     return data ? JSON.parse(data) : null;
   }
 
+  async updateGame(
+    roomUuid: string,
+    applyChange: (state: GameState) => boolean,
+  ): Promise<GameState | null> {
+    const key = redisKeys.roomGameState(roomUuid);
+    const client = this.client.duplicate();
+
+    try {
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        await client.watch(key);
+        const data = await client.get(key);
+        if (!data) {
+          await client.unwatch();
+          return null;
+        }
+
+        const state: GameState = JSON.parse(data);
+        const changed = applyChange(state);
+        if (!changed) {
+          await client.unwatch();
+          return state;
+        }
+
+        const tx = client.multi();
+        tx.set(key, JSON.stringify(state), 'KEEPTTL');
+        const result = await tx.exec();
+
+        if (result) {
+          return state;
+        }
+      }
+
+      throw new Error(`[GamesRepository] updateGame conflict retry exceeded: ${roomUuid}`);
+    } finally {
+      try {
+        await client.quit();
+      } catch {
+        client.disconnect();
+      }
+    }
+  }
+
   async saveGame(state: GameState): Promise<void> {
     const key = redisKeys.roomGameState(state.roomUuid);
     await this.client.set(key, JSON.stringify(state), 'KEEPTTL');
@@ -37,19 +79,14 @@ export class GamesRepository {
    * - 게임 상태를 가져와서 aiJudgeIDs만 변경하고 저장
    */
   async updateJudges(roomUuid: string, judgeIds: number[]): Promise<void> {
-    const key = redisKeys.roomGameState(roomUuid);
-    const data = await this.client.get(key);
+    const state = await this.updateGame(roomUuid, (gameState) => {
+      gameState.aiJudgeIDs = judgeIds;
+      return true;
+    });
 
-    if (!data) {
-      console.warn(`⚠️ [GamesRepo] 게임 상태 없음. 심사위원 저장 실패: ${roomUuid}`);
-      return;
+    if (!state) {
+      console.warn(`[GamesRepo] Game state missing. Update judges failed: ${roomUuid}`);
     }
-
-    const state: GameState = JSON.parse(data);
-    state.aiJudgeIDs = judgeIds; // 필드 업데이트
-
-    // TTL 유지(KEEPTTL)하며 저장
-    await this.client.set(key, JSON.stringify(state), 'KEEPTTL');
   }
 
   // ⭐️ [신규] 게임에 설정된 심사위원 ID 리스트 조회
@@ -67,18 +104,14 @@ export class GamesRepository {
    * 🖼️ [신규] 이미지 ID 리스트 업데이트
    */
   async updateGameImages(roomUuid: string, imageIds: number[]): Promise<void> {
-    const key = redisKeys.roomGameState(roomUuid);
-    const data = await this.client.get(key);
+    const state = await this.updateGame(roomUuid, (gameState) => {
+      gameState.imageIDs = imageIds;
+      return true;
+    });
 
-    if (!data) {
-      console.warn(`⚠️ [GamesRepo] 게임 상태 없음. 이미지 저장 실패: ${roomUuid}`);
-      return;
+    if (!state) {
+      console.warn(`[GamesRepo] Game state missing. Update images failed: ${roomUuid}`);
     }
-
-    const state: GameState = JSON.parse(data);
-    state.imageIDs = imageIds; // 필드 업데이트
-
-    await this.client.set(key, JSON.stringify(state), 'KEEPTTL');
   }
 
   async addStorySegment(roomUuid: string, text: string) {
