@@ -258,7 +258,7 @@ export class RoomsGateway {
         nickname: data.nickname, // 누가 보냈는지 알 필요가 있다면 포함
       });
 
-      this.logger.log(`🎭 Reaction: ${data.nickname} sent ${data.emoji} in room ${user.roomUuid}`);
+      // this.logger.log(`🎭 Reaction: ${data.nickname} sent ${data.emoji} in room ${user.roomUuid}`);
     } catch (error) {
       this.logger.error(`리액션 전송 실패: ${error.message}`);
     }
