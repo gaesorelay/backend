@@ -52,8 +52,8 @@ export class GamesService {
       teamBOrder: teamBIds,
       imageIDs: [],
       aiJudgeIDs: [],
-      teamAStory: [],
-      teamBStory: [],
+      teamAStory: Array(TURN_COUNT).fill(''),
+      teamBStory: Array(TURN_COUNT).fill(''),
       turnEndAt: 0,
     };
 
@@ -205,14 +205,14 @@ export class GamesService {
    * - GameFlowService가 턴 시작 시 호출함
    */
   async startTurn(roomUuid: string, turnIndex: number) {
-    const state = await this.gamesRepository.getGame(roomUuid);
+    const state = await this.gamesRepository.updateGame(roomUuid, (gameState) => {
+      gameState.currentRound = turnIndex;
+      return true;
+    });
     if (!state) return null;
 
     // 0부터 시작하므로 turnIndex - 1 (1턴 -> index 0)
     const index = turnIndex - 1;
-
-    // ⭐️ [로직] 현재 라운드 정보 업데이트
-    state.currentRound = turnIndex;
 
     // 이번 턴에 글을 써야 할 유저 토큰 계산
     // (A팀/B팀 각각 순서에 맞춰서)
@@ -221,8 +221,6 @@ export class GamesService {
 
     // 이번 턴 이미지 ID
     const imageId = state.imageIDs[index];
-
-    await this.gamesRepository.saveGame(state);
 
     return {
       turn: turnIndex,
@@ -243,11 +241,6 @@ export class GamesService {
     text: string,
     turn: number,
   ) {
-    const state = await this.gamesRepository.getGame(roomUuid);
-    if (!state) return;
-
-    const storyList = team === 'A' ? state.teamAStory : state.teamBStory;
-
     // 클라이언트가 보낸 턴을 믿고 해당 인덱스에 저장
     // 1-based -> 0-based
     const targetIndex = turn - 1;
@@ -255,17 +248,19 @@ export class GamesService {
     // 간단한 유효성 검사 (음수 방지)
     if (targetIndex < 0) return;
 
-    // 배열 구멍이 생길 수 있지만, 요청대로 "해당 턴"에 꽂아넣음
-    if (storyList[targetIndex]) {
-      console.log(`[SubmitStory] Overwrite turn ${turn}: ${text}`);
-    } else {
-      console.log(`[SubmitStory] New submission turn ${turn}: ${text}`);
-    }
+    await this.gamesRepository.updateGame(roomUuid, (state) => {
+      const storyList = team === 'A' ? state.teamAStory : state.teamBStory;
 
-    storyList[targetIndex] = text;
+      // 배열 구멍이 생길 수 있지만, 요청대로 "해당 턴"에 꽂아넣음
+      if (storyList[targetIndex]) {
+        console.log(`[SubmitStory] Overwrite turn ${turn}: ${text}`);
+      } else {
+        console.log(`[SubmitStory] New submission turn ${turn}: ${text}`);
+      }
 
-    // 3. 변경사항 저장
-    await this.gamesRepository.saveGame(state);
+      storyList[targetIndex] = text;
+      return true;
+    });
   }
 
   /**
@@ -274,20 +269,23 @@ export class GamesService {
    * 즉, targetRoundIndex 길이만큼만 남기고 나머지는 버림
    */
   async rollbackStory(roomUuid: string, targetRoundIndex: number) {
-    const state = await this.gamesRepository.getGame(roomUuid);
-    if (!state) return;
+    await this.gamesRepository.updateGame(roomUuid, (state) => {
+      let changed = false;
 
-    // 길이 조정 (splice는 원본 배열 수정)
-    // 인자가 (start, deleteCount) 이므로
-    // targetRoundIndex부터 끝까지 삭제
-    if (state.teamAStory.length > targetRoundIndex) {
-      state.teamAStory.splice(targetRoundIndex);
-    }
-    if (state.teamBStory.length > targetRoundIndex) {
-      state.teamBStory.splice(targetRoundIndex);
-    }
+      // 길이 조정 (splice는 원본 배열 수정)
+      // 인자가 (start, deleteCount) 이므로
+      // targetRoundIndex부터 끝까지 삭제
+      if (state.teamAStory.length > targetRoundIndex) {
+        state.teamAStory.splice(targetRoundIndex);
+        changed = true;
+      }
+      if (state.teamBStory.length > targetRoundIndex) {
+        state.teamBStory.splice(targetRoundIndex);
+        changed = true;
+      }
 
-    await this.gamesRepository.saveGame(state);
+      return changed;
+    });
   }
 
   /**
