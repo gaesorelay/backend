@@ -510,6 +510,7 @@ components:
         type: object
         properties:
           senderId: { type: string, description: 보낸 유저 소켓 ID }
+          publicUserId: { type: number, description: 보낸 유저 publicUserId }
           nickname: { type: string, description: 보낸 유저 닉네임 }
           message: { type: string, description: 메시지 내용 }
           type: { type: string, description: 메시지 타입 (일반/시스템) }
