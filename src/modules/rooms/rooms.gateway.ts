@@ -228,6 +228,7 @@ export class RoomsGateway {
       // 3. 방 전체 브로드캐스트
       this.server.to(user.roomUuid).emit('chat_message', {
         senderId: client.id, // 메시지 구분용
+        publicUserId: user.publicUserId, // 유저 식별용
         nickname: user.nickname, // 화면 표시 닉네임
         avatarId: user.avatarId, // 아바타 표시용
         team: user.team, // (선택) 팀별 색상 표시 등
