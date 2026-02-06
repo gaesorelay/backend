@@ -1,98 +1,108 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# 🐶 개소릴레이 (Gaeso Relay) - Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+> **"상상력의 한계를 넘는 릴레이 소설 창작 게임"**  
+> 개소릴레이는 여러 플레이어가 실시간으로 턴을 이어가며 하나의 엉뚱하고 재미있는 이야기를 완성하는 **웹 기반 멀티플레이어 게임**입니다.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+---
 
-## Description
+## 📖 프로젝트 소개
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+**개소릴레이**는 "개소리"와 "릴레이"의 합성어로, 친구들과 함께 예측 불가능한 스토리 흐름을 즐길 수 있는 서비스입니다. 
+플레이어들은 제한된 시간 내에 자신의 문장을 이어 써야 하며, AI 심사위원이 문맥과 재미를 평가하거나 투표를 통해 승자를 결정합니다.
 
-## Project setup
+### 🎯 기획 의도
+- 아이스브레이킹을 위한 게임
+- 텍스트 기반의 창의적이고 유쾌한 소통 경험 제공
+- 실시간 상호작용을 통한 몰입감 있는 게임 플레이
+- 생성형 AI를 활용한 보조 및 심사 기능 도입
 
-```bash
-$ npm install
-```
+---
 
-## Compile and run the project
+## ✨ 주요 기능
 
-```bash
-# development
-$ npm run start
+### 1. 🕒 실시간 턴제 릴레이
+- Socket.IO를 활용한 저지연 실시간 통신
+- 정해진 순서와 시간(타이머)에 맞춰 스토리 입력
+- 턴이 돌아오면 즉시 알림 및 입력창 활성화
 
-# watch mode
-$ npm run start:dev
+### 2. 🤖 AI 심사위원 (AI Judge)
+- LLM(Large Language Model) 기반의 AI가 플레이어들의 문장을 분석
+- 문맥적 개연성, 창의성, 재미 요소를 평가하여 점수 부여
+- 게임의 공정성과 의외성을 더해주는 핵심 요소
 
-# production mode
-$ npm run start:prod
-```
+### 3. 🗳️ 투표 및 결과 시스템
+- 게임 종료 후 플레이어 간 상호 투표 진행
+- AI 점수와 유저 투표를 합산하여 최종 결과 선정
 
-## Run tests
+### 4. 🃏 카드(키워드) 시스템
+- 매 턴마다 무작위 키워드 카드 제공
+- 창작의 어려움을 해소하고 이야기에 반전을 주는 장치
 
-```bash
-# unit tests
-$ npm run test
+---
 
-# e2e tests
-$ npm run test:e2e
+## 🛠️ 기술 스택 (Tech Stack)
 
-# test coverage
-$ npm run test:cov
-```
+| 분류 | 기술 | 비고 |
+| --- | --- | --- |
+| **Language** | ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white) | |
+| **Framework** | ![NestJS](https://img.shields.io/badge/NestJS-E0234E?style=flat&logo=nestjs&logoColor=white) | Backend Core |
+| **Database** | ![Redis](https://img.shields.io/badge/Redis-DC382D?style=flat&logo=redis&logoColor=white) | In-memory Game State / Session |
+| **Communication** | ![Socket.IO](https://img.shields.io/badge/Socket.io-010101?style=flat&logo=socketdotio&logoColor=white) | Real-time WebSocket |
+| **External API** | **OpenAI / GMS** | AI Story Evaluation |
 
-## Deployment
+---
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+## 📂 프로젝트 구조
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+backend
+├── 📂 exec                 # 포팅 매뉴얼 및 산출물 폴더
+├── 📂 src
+│   ├── 📂 common           # 공통 모듈 (Filters, Guards, Pipes 등)
+│   ├── 📂 config           # 환경 변수 및 설정 파일
+│   ├── 📂 modules          # 도메인별 모듈
+│   │   ├── 📂 auth         # 인증/인가
+│   │   ├── 📂 games        # 게임 로직 (Core)
+│   │   ├── 📂 rooms        # 대기방 관리
+│   │   ├── 📂 users        # 사용자 관리
+│   │   └── ...
+│   ├── 📂 lib              # 외부 라이브러리 연동
+│   └── 📄 main.ts          # 진입점 (Entry Point)
+├── 📄 .env.example         # 환경 변수 예시
+└── 📄 package.json
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+---
 
-## Resources
+## 🚀 시작 가이드 (Getting Started)
 
-Check out a few resources that may come in handy when working with NestJS:
+### 1. 사전 요구 사항
+- **Node.js**: v20 이상
+- **Redis**: 6379 포트 실행 중
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+### 2. 설치 및 실행
 
-## Support
+**의존성 설치**
+```bash
+npm install
+```
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+**개발 모드 실행**
+```bash
+npm run start:dev
+```
 
-## Stay in touch
+**프로덕션 빌드 및 실행**
+```bash
+npm run build
+npm run start:prod
+```
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+### 3. 환경 변수 설정
+최상위 경로에 `.env` 파일을 생성하고 다음 변수를 설정하세요.
+```env
+PORT=8000
+REDIS_HOST=localhost
+REDIS_PORT=6379
+GMS_API_KEY=your_api_key_here
+```
