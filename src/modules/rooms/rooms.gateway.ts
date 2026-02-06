@@ -107,6 +107,19 @@ export class RoomsGateway {
     this.logger.log(`leave_room 요청: socket ${client.id}`);
 
     try {
+      let shouldCloseRoom = false;
+      let closingRoomUuid: string | null = null;
+
+      try {
+        const user = await this.roomsService.getUserBySocket(client.id);
+        const room = await this.roomsService.getRoomById(user.roomUuid);
+        shouldCloseRoom = user.isHost && !room.isStarted;
+        closingRoomUuid = user.roomUuid;
+      } catch (precheckError) {
+        const message = precheckError instanceof Error ? precheckError.message : 'unknown error';
+        this.logger.warn(`leave_room precheck failed: ${message}`);
+      }
+
       const result = await this.roomsService.leaveRoom(client.id);
       if (!result) {
         return { status: 'error', message: '유저 정보를 찾을 수 없습니다.' };
@@ -127,6 +140,12 @@ export class RoomsGateway {
         message: `${nickname}님이 퇴장했습니다.`,
         type: 'system',
       });
+
+      if (shouldCloseRoom && closingRoomUuid === roomUuid) {
+        this.server.to(roomUuid).emit('room_closed', {
+          reason: '방장이 나가서 방이 종료되었습니다.',
+        });
+      }
 
       return { status: 'success' };
     } catch (error) {
