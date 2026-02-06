@@ -9,8 +9,8 @@ export class RoomsController {
   constructor(private readonly roomsService: RoomsService) {}
 
   @Post()
-  @UseGuards(ThrottlerGuard)
-  @Throttle({ 'room-creation': { limit: 3, ttl: 60000 } })
+  // @UseGuards(ThrottlerGuard)
+  // @Throttle({ 'room-creation': { limit: 3, ttl: 60000 } })
   createRoom(@Body() body: CreateRoomDto): Promise<CreateRoomResponseDto> {
     return this.roomsService.createRoom(body);
   }
