@@ -28,6 +28,20 @@ export class CoreGateway implements OnGatewayConnection, OnGatewayDisconnect {
   async handleDisconnect(client: Socket) {
     this.logger.log(`Client Disconnected from Game Namespace : ${client.id}`);
 
+    let shouldCloseRoom = false;
+    let closingRoomUuid: string | null = null;
+
+    try {
+      const user = await this.roomsService.getUserBySocket(client.id);
+      const room = await this.roomsService.getRoomById(user.roomUuid);
+      shouldCloseRoom = user.isHost && !room.isStarted;
+      closingRoomUuid = user.roomUuid;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'unknown error';
+      this.logger.warn(`disconnect precheck failed: ${message}`);
+    }
+
+
     try {
       await this.roomsService.handleConnectionLoss(client.id);
 
@@ -42,6 +56,12 @@ export class CoreGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
     } catch (error) {
       this.logger.error(`퇴장 처리 중 에러: ${error.message}`);
+    }
+
+    if (shouldCloseRoom && closingRoomUuid) {
+      this.server.to(closingRoomUuid).emit('room_closed', {
+        reason: 'Host disconnected. Room closed.',
+      });
     }
   }
 }
