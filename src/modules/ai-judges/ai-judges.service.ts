@@ -27,19 +27,16 @@ export class AiJudgeService {
    * [신규] 심사위원 선정 및 저장 (RoomsService가 호출함)
    */
   async selectAndSaveJudges(roomUuid: string): Promise<JudgeConfig[]> {
-    const tempPersonas = [...PERSONAS];
+    const fixedJudgeIds = [1, 10, 12]; // 멍성재, 카니, 운동현
     const selectedJudges: JudgeConfig[] = [];
 
-    for (let i = 0; i < 3; i++) {
-      if (tempPersonas.length === 0) break;
-      const randomIdx = Math.floor(Math.random() * tempPersonas.length);
-      selectedJudges.push(tempPersonas[randomIdx]);
-      tempPersonas.splice(randomIdx, 1);
+    for (const id of fixedJudgeIds) {
+      const judge = PERSONAS.find((p) => p.id === id);
+      if (judge) selectedJudges.push(judge);
     }
 
-    const judgeIds = selectedJudges.map((j) => j.id);
     // 3. ⭐️ [변경] 직접 저장 안 하고 GamesService에게 위임!
-    await this.gamesService.updateGameJudges(roomUuid, judgeIds);
+    await this.gamesService.updateGameJudges(roomUuid, fixedJudgeIds);
 
     return selectedJudges;
   }
