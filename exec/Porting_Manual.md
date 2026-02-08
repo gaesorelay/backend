@@ -42,8 +42,8 @@ npm run start:dev
 npm run start:prod
 ```
 
-## 4. 환경 변수 설정 (.env)
-프로젝트 루트 디렉토리에 `.env` 파일을 생성하고 아래 내용을 설정해야 합니다.
+## 4. 환경 변수 설정 (.env.development or .env.production)
+프로젝트 루트 디렉토리에 `.env.development`(or `env.production`) 파일을 생성하고 아래 내용을 설정해야 합니다.
 
 | 변수명 | 설명 | 예시 값 |
 | --- | --- | --- |
