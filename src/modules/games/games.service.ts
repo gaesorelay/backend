@@ -73,8 +73,20 @@ export class GamesService {
    * 🎲 [신규] 랜덤 이미지 TURN_COUNT개 선정 및 저장
    */
   async selectAndSaveImages(roomUuid: string): Promise<number[]> {
-    // ⭐️ [수정] 카드 셔플 로직을 고정된 ID로 변경
-    const imageIds = [6, 20, 22, 24, 31, 38];
+    // 1. 전체 이미지 목록 복사 (원본 보호)
+    const allImages = [...GAME_IMAGES];
+
+    // 2. Fisher-Yates Shuffle (무작위 섞기)
+    for (let i = allImages.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [allImages[i], allImages[j]] = [allImages[j], allImages[i]];
+    }
+
+    // 3. 앞에서 TURN_COUNT개 자르기
+    const selectedImages = allImages.slice(0, TURN_COUNT);
+
+    // 4. ID만 추출
+    const imageIds = selectedImages.map((img) => img.id);
 
     // 5. Repository 호출하여 저장
     await this.gamesRepository.updateGameImages(roomUuid, imageIds);
