@@ -1,5 +1,5 @@
 # 🐶 개소릴레이 (Gaesorelay)
-![](https://velog.velcdn.com/images/zhy2on/post/6ac9a867-6896-43a7-89fa-e03fdc810bd2/image.png)
+<img src="https://velog.velcdn.com/images/zhy2on/post/6ac9a867-6896-43a7-89fa-e03fdc810bd2/image.png" width=700>
 
 > **"말이 되든 말든 이어가라! 개연성은 없어도 재미는 확실한 릴레이 스토리 게임"**  
 > 
@@ -1161,15 +1161,16 @@ REDIS_PORT=6379
 GMS_API_KEY=your_api_key_here
 ```
 
-## 🐕 팀원 소개
+## 🐕 역할 소개
 
-|<img src="https://velog.velcdn.com/images/zhy2on/post/7f3d3d30-74e7-47c7-92b0-fbdde4cee244/image.png" width=130> |<img src="https://velog.velcdn.com/images/zhy2on/post/c06b82aa-b33f-4110-97a4-32e6f66da4c5/image.png" width=120>|<img src="https://velog.velcdn.com/images/zhy2on/post/6a43de82-0304-4e4d-b721-1ad23881bc74/image.png" width=150> |
-|:---:|:---:|:---:|
-|김민준|배현지|진준영|
-|FE| FE | FE |
+|<center><img src="https://velog.velcdn.com/images/zhy2on/post/7f3d3d30-74e7-47c7-92b0-fbdde4cee244/image.png" width=130></center> |<center><img src="https://velog.velcdn.com/images/zhy2on/post/c06b82aa-b33f-4110-97a4-32e6f66da4c5/image.png" width=120></center>|<center><img src="https://velog.velcdn.com/images/zhy2on/post/6a43de82-0304-4e4d-b721-1ad23881bc74/image.png" width=150></center> |
+|---|---|---|
+|<center>김민준</center>|<center>배현지</center>|<center>진준영</center>|
+|<center>FE</center>|<center>FE</center>|<center>FE</center>|
+| - 백엔드의 게임데이터와 AI 모델의 심사데이터를 사용자 화면으로 실시간 연동 <br> - Zustand를 활용한 게임 state 관리 및 데이터 흐름 제어 <br> - Socket.IO 기반 실시간 스토리 작성과 저장 및 리액션 기능 구현  | - 메인페이지 / 대기실 페이지 / 투표 페이지 / 게임 페이지 UI 구현 | - 방 만들기 / 프로필 설정 / 카드 & 심사위원 추첨 페이지ㅤ <br> - 심사 결과 페이지 UI 구현ㅤㅤㅤㅤㅤㅤㅤ  |
 
-|<img src="https://velog.velcdn.com/images/zhy2on/post/a05e5f92-6bea-4723-bfec-53b893e832b5/image.png" width=140>|<img src="https://velog.velcdn.com/images/zhy2on/post/8d5b9d47-0b7a-4f80-a20b-19984ce24070/image.png" width=130> |<img src="https://velog.velcdn.com/images/zhy2on/post/db65ba41-fb04-473c-bee7-455ee19ffa23/image.png" width=140> |
-|:---:|:---:|:---:|
-|오지현|김택우|송하준|
-|Infra / BE| BE | BE |
-
+|<center><img src="https://velog.velcdn.com/images/zhy2on/post/a05e5f92-6bea-4723-bfec-53b893e832b5/image.png" width=140></center>|<center><img src="https://velog.velcdn.com/images/zhy2on/post/8d5b9d47-0b7a-4f80-a20b-19984ce24070/image.png" width=130></center> |<center><img src="https://velog.velcdn.com/images/zhy2on/post/db65ba41-fb04-473c-bee7-455ee19ffa23/image.png" width=140></center> |
+|---|---|---|
+|<center>오지현</center>|<center>김택우</center>|<center>송하준</center>|
+|<center>Infra / BE</center>|<center>BE</center>|<center>BE</center>|
+| - AWS·Docker 기반 인프라 구축 및 Jenkins CI/CD 배포 자동화 |- Socket.IO 기반 실시간 게임 아키텍처 설계 및 동기화 기능 구현 <br> - 어뷰징 방지(쓰로틀링·욕설 필터·IP 밴) 기능 구현 <br> - NestJS 소켓 세션 관리(재접속·방 정리) 구현 <br> |- 방 상태 라이프사이클 구현 <br> - 옵저버 패턴 기반의 게임 흐름 시스템 구현 <br> - Redis WATCH/MULTI를 이용한 낙관적 락 동시성 처리 구현 |
