@@ -6,18 +6,178 @@ info:
 servers:
   - url: http://localhost:8000/api
     description: 로컬 개발 서버
+components:
+  schemas:
+    RoomConfig:
+      type: object
+      properties:
+        roundCount:
+          type: number
+          description: 총 라운드 수
+          example: 3
+        roundTimeSeconds:
+          type: number
+          description: 라운드 당 시간 (초)
+          example: 60
+        votingTimeSeconds:
+          type: number
+          description: 투표 시간 (초)
+          example: 30
+        teamSize:
+          type: number
+          description: 팀당 인원 수
+          example: 4
+      required:
+        - roundCount
+        - roundTimeSeconds
+        - votingTimeSeconds
+        - teamSize
+    CreateRoomDto:
+      type: object
+      properties:
+        title:
+          type: string
+          description: 방 제목
+          example: "즐거운 개소릴레이"
+        config:
+          $ref: '#/components/schemas/RoomConfig'
+        avatarId:
+          type: number
+          description: 방장이 선택한 아바타 ID
+          example: 1
+      required:
+        - title
+        - config
+        - avatarId
+    CreateRoomResponseDto:
+      type: object
+      properties:
+        roomId:
+          type: string
+          description: 생성된 방의 UUID
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        token:
+          type: string
+          description: 방장 토큰 (재접속 식별용)
+          example: "user-token-uuid-1234"
+      required:
+        - roomId
+        - token
+    RoomResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "success"
+        data:
+          type: object
+          properties:
+            roomUuid:
+              type: string
+              description: 방 UUID
+            inviteCode:
+              type: string
+              description: 초대 코드
+            ownerUserToken:
+              type: string
+              description: 방장 토큰
+            title:
+              type: string
+              description: 방 제목
+            status:
+              type: string
+              description: 방 상태 (LOBBY, PLAYING, VOTING, RESULT)
+              enum: [LOBBY, PLAYING, VOTING, RESULT]
+            config:
+              $ref: '#/components/schemas/RoomConfig'
+            createdAt:
+              type: number
+              description: 생성 시간 (Timestamp)
+            currentUserCount:
+              type: number
+              description: 현재 접속 중인 인원 수
+          required:
+            - roomUuid
+            - inviteCode
+            - ownerUserToken
+            - title
+            - status
+            - config
+            - createdAt
+            - currentUserCount
+    # AI Judge Schemas
+    ImageContextDto:
+      type: object
+      properties:
+        tags:
+          type: array
+          items:
+            type: string
+          description: 이미지 관련 태그 목록
+          example: ["강아지", "산책"]
+        description:
+          type: string
+          description: 이미지 설명
+          example: "강아지가 공원에서 산책하고 있다."
+    EvaluateRequestDto:
+      type: object
+      properties:
+        genre:
+          type: string
+          description: 스토리 장르
+          example: "막장드라마"
+        images:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImageContextDto'
+        sentence:
+          type: string
+          description: 사용자가 작성한 문장
+          example: "주인공은 사실 재벌 3세였다."
+        judgeIds:
+          type: array
+          items:
+            type: number
+          description: 심사위원 ID 목록
+          example: [1, 2, 3]
+      required:
+        - genre
+        - images
+        - sentence
+        - judgeIds
+    PersonaResult:
+      type: object
+      properties:
+        personaName:
+          type: string
+          description: 심사위원(페르소나) 이름
+          example: "냉철한 평론가"
+        score:
+          type: number
+          description: 점수 (0-100)
+          example: 85
+        comment:
+          type: string
+          description: 심사평
+          example: "스토리 개연성이 조금 부족하지만 충격적인 반전이 흥미롭군요."
 
-# ------------------------------
-# API 경로 (Paths)
-# ------------------------------
 paths:
-  # [방 생성 API]
-  # - 방을 생성하고 방장의 토큰을 발급합니다.
+  /:
+    get:
+      summary: 서버 상태 확인
+      description: 서버가 정상 작동 중인지 확인하는 간단한 메시지를 반환합니다.
+      responses:
+        '200':
+          description: 성공
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "DogSound Relay Server Running!"
   /rooms:
     post:
       summary: 방 생성
-      description: 새로운 게임 방을 생성합니다. 초기 설정값(Config)과 방장의 아바타 ID를 요청으로 받습니다.
-      operationId: createRoom
+      description: 입력받은 설정으로 새로운 게임 방을 생성합니다.
       requestBody:
         required: true
         content:
@@ -26,56 +186,36 @@ paths:
               $ref: '#/components/schemas/CreateRoomDto'
       responses:
         '201':
-          description: 방 생성 성공 (roomId 및 방장 token 반환)
+          description: 방 생성 성공
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/CreateRoomResponseDto'
-  
-  # [방 정보 조회 API]
-  # - 방의 상태, 현재 인원 등 상세 정보를 조회합니다.
   /rooms/{roomUuid}:
     get:
       summary: 방 정보 조회
-      description: 특정 방의 설정 정보와 현재 상태를 조회합니다.
-      operationId: getRoom
+      description: 특정 방의 상세 정보와 현재 접속 인원 수를 조회합니다.
       parameters:
-        - name: roomUuid
-          in: path
-          description: 조회할 방의 UUID
+        - in: path
+          name: roomUuid
           required: true
           schema:
             type: string
+          description: 조회할 방의 UUID
       responses:
         '200':
           description: 조회 성공
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: success
-                    description: API 호출 결과 상태 (success/fail)
-                  data:
-                    allOf:
-                      - $ref: '#/components/schemas/Room'
-                      - type: object
-                        properties:
-                          currentUserCount:
-                            type: number
-                            description: 현재 방에 접속 중인 실시간 유저 수
+                $ref: '#/components/schemas/RoomResponse'
         '404':
-          description: 존재하지 않는 방입니다.
-
-  # [AI 심사 요청 API]
-  # - 제출된 문장과 이미지를 AI 페르소나에게 전달하여 평가를 받습니다.
+          description: 해당 방을 찾을 수 없음
+  
   /ai-judge/evaluate:
     post:
       summary: AI 심사 요청
-      description: 사용자가 제출한 문장과 이미지 태그 정보를 기반으로, 선택된 AI 심사위원들이 점수와 코멘트를 반환합니다.
-      operationId: evaluateSubmission
+      description: 작성된 스토리와 이미지 정보를 바탕으로 AI 심사위원의 평가를 요청합니다.
       requestBody:
         required: true
         content:
@@ -84,175 +224,10 @@ paths:
               $ref: '#/components/schemas/EvaluateRequestDto'
       responses:
         '201':
-          description: 심사 완료 (심사위원별 평가 결과 반환)
+          description: 심사 성공
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: '#/components/schemas/PersonaResult'
-
-# ------------------------------
-# 데이터 모델 (Schemas)
-# ------------------------------
-components:
-  schemas:
-    # 1. 방 생성 요청 DTO
-    CreateRoomDto:
-      type: object
-      properties:
-        title:
-          type: string
-          description: 방 제목
-          example: "즐거운 게임 한 판!"
-        config:
-          $ref: '#/components/schemas/RoomConfig'
-        avatarId:
-          type: number
-          description: 방장의 아바타 ID (1~5)
-          example: 1
-      required:
-        - title
-        - config
-        - avatarId
-
-    # 2. 방 설정 정보
-    RoomConfig:
-      type: object
-      properties:
-        maxPlayers:
-          type: number
-          description: 전체 정원 (플레이어 + 관전자)
-          example: 8
-        storytellerCount:
-          type: number
-          description: 이야기꾼 수 (팀별 슬롯 개수)
-          example: 4
-        rounds:
-          type: number
-          description: 진행할 총 라운드 수
-          example: 3
-        roundTime:
-          type: number
-          description: 라운드 별 제한 시간 (초 단위)
-          example: 60
-        voteTime:
-          type: number
-          description: 투표 제한 시간 (초 단위)
-          example: 30
-      required:
-        - maxPlayers
-        - storytellerCount
-        - rounds
-        - roundTime
-        - voteTime
-
-    # 3. 방 생성 응답 DTO
-    CreateRoomResponseDto:
-      type: object
-      properties:
-        roomId:
-          type: string
-          description: 생성된 방의 UUID (소켓 연결 namespace로 사용됨)
-          example: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
-        token:
-          type: string
-          description: 방장 권한 토큰 (재접속 및 방장 권한 인증용)
-          example: "token-uuid-1234"
-      required:
-        - roomId
-        - token
-
-    # 4. 방 기본 정보 모델
-    Room:
-      type: object
-      properties:
-        roomUuid:
-          type: string
-          description: 방 UUID
-        title:
-          type: string
-          description: 방 제목
-        status:
-          type: string
-          enum: [WAITING, PLAYING, RESULTING, ENDED]
-          description: |
-            방 상태:
-            - WAITING: 대기 중 (로비)
-            - PLAYING: 게임 진행 중
-            - RESULTING: 결과 집계 중
-            - ENDED: 게임 종료
-        isStarted:
-          type: boolean
-          description: 게임 시작 여부 (true면 게임 중)
-        config:
-          $ref: '#/components/schemas/RoomConfig'
-        createdAt:
-          type: number
-          description: 방 생성 시간 (Unix Timestamp)
-
-    # 5. AI 심사 요청 DTO
-    EvaluateRequestDto:
-      type: object
-      properties:
-        genre:
-          type: string
-          description: 게임 장르 (ex. 판타지, 스릴러)
-          example: "판타지"
-        images:
-          type: array
-          items:
-            $ref: '#/components/schemas/ImageContextDto'
-          description: 문장과 관련된 이미지 정보 목록
-        sentence:
-          type: string
-          description: 평가받을 플레이어의 제출 문장
-          example: "용사가 칼을 뽑아들고 소리쳤다."
-        judgeIds:
-          type: array
-          items:
-            type: number
-          description: 심사를 요청할 AI 심사위원 ID 목록
-          example: [1, 2, 3]
-      required:
-        - genre
-        - images
-        - sentence
-        - judgeIds
-
-    # 6. 이미지 컨텍스트 DTO
-    ImageContextDto:
-      type: object
-      properties:
-        tags:
-          type: array
-          items:
-            type: string
-          description: 이미지 분석 태그 목록
-        description:
-          type: string
-          description: 이미지에 대한 텍스트 설명
-      required:
-        - tags
-        - description
-
-    # 7. AI 페르소나 심사 결과
-    PersonaResult:
-      type: object
-      properties:
-        personaName:
-          type: string
-          description: 심사위원 페르소나 이름
-          example: "엄격한 김부장"
-        score:
-          type: number
-          description: 평가 점수 (0~100)
-          example: 85
-        comment:
-          type: string
-          description: AI 심사평 (한줄 평)
-          example: "문맥은 훌륭하지만 창의성이 조금 부족하군요."
-      required:
-        - personaName
-        - score
-        - comment
