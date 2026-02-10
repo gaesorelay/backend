@@ -1202,9 +1202,9 @@ GMS_API_KEY=your_api_key_here
   <!-- 4행: 역할 설명 (좌측 정렬) -->
   <tr>
     <td style="text-align:left; vertical-align:top;">
-      - 백엔드의 게임데이터와 AI 모델의 심사데이터를 사용자 화면으로 실시간 연동<br>
-      - Zustand를 활용한 게임 state 관리 및 데이터 흐름 제어<br>
-      - Socket.IO 기반 실시간 스토리 작성과 저장 및 리액션 기능 구현
+      - 백엔드 게임 데이터와 AI 심사 결과를 화면에 실시간 반영<br>
+      - Zustand를 활용한 게임 상태 관리 및 데이터 흐름 제어<br>
+      - Socket.IO 기반 실시간 스토리 작성·저장 및 리액션 기능 구현
     </td>
     <td style="text-align:left; vertical-align:top;">
       - 메인페이지 / 대기실 페이지 / 투표 페이지 / 게임 페이지 UI 구현
