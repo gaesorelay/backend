@@ -1,5 +1,7 @@
 # 🐶 개소릴레이 (Gaesorelay)
-<img src="https://velog.velcdn.com/images/zhy2on/post/6ac9a867-6896-43a7-89fa-e03fdc810bd2/image.png" width=700>
+<div align="center">
+  <img src="https://velog.velcdn.com/images/zhy2on/post/6ac9a867-6896-43a7-89fa-e03fdc810bd2/image.png" />
+</div>
 
 > **"말이 되든 말든 이어가라! 개연성은 없어도 재미는 확실한 릴레이 스토리 게임"**  
 > 
@@ -38,10 +40,10 @@
 ---
 
 ## ⚙️ 시스템 아키텍쳐
-<img src="https://velog.velcdn.com/images/zhy2on/post/b50f6681-86c3-4f1a-a72a-318956dc9883/image.png" width=600>
+<img src="https://velog.velcdn.com/images/zhy2on/post/b50f6681-86c3-4f1a-a72a-318956dc9883/image.png" width=700>
 
 ## 🧱 ERD
-<img src="https://velog.velcdn.com/images/zhy2on/post/8c536f6e-cabe-48b6-a4a6-d4781bcf0c45/image.png" width=700>
+<img src="https://velog.velcdn.com/images/zhy2on/post/8c536f6e-cabe-48b6-a4a6-d4781bcf0c45/image.png" width=800>
 
 |엔티티 |역할 |
 |---|---|
