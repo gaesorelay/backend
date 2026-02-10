@@ -1165,14 +1165,101 @@ GMS_API_KEY=your_api_key_here
 
 ## 🐕 역할 소개
 
-|<center><img src="https://velog.velcdn.com/images/zhy2on/post/7f3d3d30-74e7-47c7-92b0-fbdde4cee244/image.png" width=130></center> |<center><img src="https://velog.velcdn.com/images/zhy2on/post/c06b82aa-b33f-4110-97a4-32e6f66da4c5/image.png" width=120></center>|<center><img src="https://velog.velcdn.com/images/zhy2on/post/6a43de82-0304-4e4d-b721-1ad23881bc74/image.png" width=150></center> |
-|---|---|---|
-|<center>김민준</center>|<center>배현지</center>|<center>진준영</center>|
-|<center>FE</center>|<center>FE</center>|<center>FE</center>|
-| - 백엔드의 게임데이터와 AI 모델의 심사데이터를 사용자 화면으로 실시간 연동 <br> - Zustand를 활용한 게임 state 관리 및 데이터 흐름 제어 <br> - Socket.IO 기반 실시간 스토리 작성과 저장 및 리액션 기능 구현  | - 메인페이지 / 대기실 페이지 / 투표 페이지 / 게임 페이지 UI 구현 | - 방 만들기 / 프로필 설정 / 카드 & 심사위원 추첨 페이지ㅤ <br> - 심사 결과 페이지 UI 구현ㅤㅤㅤㅤㅤㅤㅤ  |
+<table style="width:100%; table-layout:fixed; border-collapse:collapse;">
+  <colgroup>
+    <col style="width:33.33%" />
+    <col style="width:33.33%" />
+    <col style="width:33.33%" />
+  </colgroup>
 
-|<center><img src="https://velog.velcdn.com/images/zhy2on/post/a05e5f92-6bea-4723-bfec-53b893e832b5/image.png" width=140></center>|<center><img src="https://velog.velcdn.com/images/zhy2on/post/8d5b9d47-0b7a-4f80-a20b-19984ce24070/image.png" width=130></center> |<center><img src="https://velog.velcdn.com/images/zhy2on/post/db65ba41-fb04-473c-bee7-455ee19ffa23/image.png" width=140></center> |
-|---|---|---|
-|<center>오지현</center>|<center>김택우</center>|<center>송하준</center>|
-|<center>Infra / BE</center>|<center>BE</center>|<center>BE</center>|
-| - AWS·Docker 기반 인프라 구축 및 Jenkins CI/CD 배포 자동화 |- Socket.IO 기반 실시간 게임 아키텍처 설계 및 동기화 기능 구현 <br> - 어뷰징 방지(쓰로틀링·욕설 필터·IP 밴) 기능 구현 <br> - NestJS 소켓 세션 관리(재접속·방 정리) 구현 <br> |- 방 상태 라이프사이클 구현 <br> - 옵저버 패턴 기반의 게임 흐름 시스템 구현 <br> - Redis WATCH/MULTI를 이용한 낙관적 락 동시성 처리 구현 |
+  <!-- 1행: 이미지 -->
+  <tr>
+    <td align="center">
+      <img src="https://velog.velcdn.com/images/zhy2on/post/7f3d3d30-74e7-47c7-92b0-fbdde4cee244/image.png" width="120" />
+    </td>
+    <td align="center">
+      <img src="https://velog.velcdn.com/images/zhy2on/post/c06b82aa-b33f-4110-97a4-32e6f66da4c5/image.png" width="120" />
+    </td>
+    <td align="center">
+      <img src="https://velog.velcdn.com/images/zhy2on/post/6a43de82-0304-4e4d-b721-1ad23881bc74/image.png" width="140" />
+    </td>
+  </tr>
+
+  <!-- 2행: 이름 -->
+  <tr>
+    <td align="center"><b>김민준</b></td>
+    <td align="center"><b>배현지</b></td>
+    <td align="center"><b>진준영</b></td>
+  </tr>
+
+  <!-- 3행: 역할 -->
+  <tr>
+    <td align="center">FE</td>
+    <td align="center">FE</td>
+    <td align="center">FE</td>
+  </tr>
+
+  <!-- 4행: 역할 설명 (좌측 정렬) -->
+  <tr>
+    <td style="text-align:left; vertical-align:top;">
+      - 백엔드 게임 데이터와 AI 심사 결과를 화면에 실시간 반영<br>
+      - Zustand를 활용한 게임 상태 관리 및 데이터 흐름 제어<br>
+      - Socket.IO 기반 실시간 스토리 작성·저장 및 리액션 기능 구현
+    </td>
+    <td style="text-align:left; vertical-align:top;">
+      - 메인페이지 / 대기실 페이지 / 투표 페이지 / 게임 페이지 UI 구현
+    </td>
+    <td style="text-align:left; vertical-align:top;">
+      - 방 만들기 / 프로필 설정 / 카드 & 심사위원 추첨 페이지<br>
+      - 심사 결과 페이지 UI 구현
+    </td>
+  </tr>
+
+  <!-- 구분선 -->
+  <tr><td colspan="3" style="height:20px;"></td></tr>
+
+  <!-- 5행: 이미지 -->
+  <tr>
+    <td align="center">
+      <img src="https://velog.velcdn.com/images/zhy2on/post/a05e5f92-6bea-4723-bfec-53b893e832b5/image.png" width="130" />
+    </td>
+    <td align="center">
+      <img src="https://velog.velcdn.com/images/zhy2on/post/8d5b9d47-0b7a-4f80-a20b-19984ce24070/image.png" width="120" />
+    </td>
+    <td align="center">
+      <img src="https://velog.velcdn.com/images/zhy2on/post/db65ba41-fb04-473c-bee7-455ee19ffa23/image.png" width="130" />
+    </td>
+  </tr>
+
+  <!-- 6행: 이름 -->
+  <tr>
+    <td align="center"><b>오지현</b></td>
+    <td align="center"><b>김택우</b></td>
+    <td align="center"><b>송하준</b></td>
+  </tr>
+
+  <!-- 7행: 역할 -->
+  <tr>
+    <td align="center">Infra / BE</td>
+    <td align="center">BE</td>
+    <td align="center">BE</td>
+  </tr>
+
+  <!-- 8행: 역할 설명 -->
+  <tr>
+    <td style="text-align:left; vertical-align:top;">
+      - AWS·Docker 기반 인프라 구축<br>
+      - Jenkins CI/CD 배포 자동화
+    </td>
+    <td style="text-align:left; vertical-align:top;">
+      - Socket.IO 기반 실시간 게임 아키텍처 설계 및 동기화 기능 구현<br>
+      - 어뷰징 방지(쓰로틀링·욕설 필터·IP 밴) 기능 구현<br>
+      - NestJS 소켓 세션 관리(재접속·방 정리) 구현
+    </td>
+    <td style="text-align:left; vertical-align:top;">
+      - 방 상태 라이프사이클 구현<br>
+      - 옵저버 패턴 기반 게임 흐름 시스템 구현<br>
+      - Redis WATCH/MULTI 기반 동시성 처리
+    </td>
+  </tr>
+</table>
