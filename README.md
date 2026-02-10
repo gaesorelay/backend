@@ -23,25 +23,25 @@
 ## ✨ 주요 기능
 
 |메인페이지|방 만들기|
-|---|---|
-|  |  | 
+|:---:|:---:|
+|<img src="https://velog.velcdn.com/images/zhy2on/post/d88dd8bc-fe51-4fb9-8861-32d170c84c90/image.gif" width=500> |<img src="https://velog.velcdn.com/images/zhy2on/post/81312fa0-8571-4414-84e0-37e2edf22ce6/image.gif" width=500> | 
 |코드로 입장 & 닉네임 설정| 대기실|
-|  |  |
+|<img src="https://velog.velcdn.com/images/zhy2on/post/5a1129ae-0d0d-48c7-b97d-dfb7d2f9882b/image.gif" width=500>|<img src="https://velog.velcdn.com/images/zhy2on/post/1641be49-5b00-4943-975c-e2093beed551/image.gif" width=500>|
 |실시간 릴레이 글쓰기 (A팀)| 실시간 릴레이 글쓰기 (B팀)|
-|  |  |
+|<img src="https://velog.velcdn.com/images/zhy2on/post/9bf3e103-5173-4fca-9e27-5082c51f0a79/image.gif" width=500> |<img src="https://velog.velcdn.com/images/zhy2on/post/6b6a39b9-54be-4e6d-96b1-2cda5c1c7962/image.gif" width=500> |
 |실시간 관객 참여 (댓글 / 반응)| 실시간 관객 참여 (투표)|
-|  |  |
+|<img src="https://velog.velcdn.com/images/zhy2on/post/ceebb347-db84-4300-a3f9-a284d043f826/image.gif" width=150> | <img src="https://velog.velcdn.com/images/zhy2on/post/315c62a5-e1b4-4b79-b298-eb55bce120e5/image.gif" width=500> |
 |스토리북|AI 심사 결과|
-|  |  |
+|<img src="https://velog.velcdn.com/images/zhy2on/post/97805140-d391-4e42-ad9a-1dbf5a144168/image.gif" width=500> | <img src="https://velog.velcdn.com/images/zhy2on/post/34d73816-248b-47e7-a109-be5ce8bb60e6/image.gif" width=500> |
 
 
 ---
 
 ## ⚙️ 시스템 아키텍쳐
-![](https://velog.velcdn.com/images/zhy2on/post/b50f6681-86c3-4f1a-a72a-318956dc9883/image.png)
+<img src="https://velog.velcdn.com/images/zhy2on/post/b50f6681-86c3-4f1a-a72a-318956dc9883/image.png" width=600>
 
 ## 🧱 ERD
-![](https://velog.velcdn.com/images/zhy2on/post/8c536f6e-cabe-48b6-a4a6-d4781bcf0c45/image.png)
+<img src="https://velog.velcdn.com/images/zhy2on/post/8c536f6e-cabe-48b6-a4a6-d4781bcf0c45/image.png" width=700>
 
 |엔티티 |역할 |
 |---|---|
@@ -152,7 +152,7 @@
 ---
 ## 📋 API 명세서
 
-<details> <summary><b>Swagger API Docse</b></summary> <br>
+<details> <summary><b>Swagger API Docs</b></summary> <br>
    
 ```yaml
 openapi: 3.0.0
@@ -1163,12 +1163,12 @@ GMS_API_KEY=your_api_key_here
 
 ## 🐕 팀원 소개
 
-|![](https://velog.velcdn.com/images/zhy2on/post/7f3d3d30-74e7-47c7-92b0-fbdde4cee244/image.png) |![](https://velog.velcdn.com/images/zhy2on/post/c06b82aa-b33f-4110-97a4-32e6f66da4c5/image.png) |![](https://velog.velcdn.com/images/zhy2on/post/6a43de82-0304-4e4d-b721-1ad23881bc74/image.png) |
+|<img src="https://velog.velcdn.com/images/zhy2on/post/7f3d3d30-74e7-47c7-92b0-fbdde4cee244/image.png" width=130> |<img src="https://velog.velcdn.com/images/zhy2on/post/c06b82aa-b33f-4110-97a4-32e6f66da4c5/image.png" width=120>|<img src="https://velog.velcdn.com/images/zhy2on/post/6a43de82-0304-4e4d-b721-1ad23881bc74/image.png" width=150> |
 |:---:|:---:|:---:|
 |김민준|배현지|진준영|
 |FE| FE | FE |
 
-|![](https://velog.velcdn.com/images/zhy2on/post/a05e5f92-6bea-4723-bfec-53b893e832b5/image.png)|![](https://velog.velcdn.com/images/zhy2on/post/8d5b9d47-0b7a-4f80-a20b-19984ce24070/image.png) |![](https://velog.velcdn.com/images/zhy2on/post/db65ba41-fb04-473c-bee7-455ee19ffa23/image.png) |
+|<img src="https://velog.velcdn.com/images/zhy2on/post/a05e5f92-6bea-4723-bfec-53b893e832b5/image.png" width=140>|<img src="https://velog.velcdn.com/images/zhy2on/post/8d5b9d47-0b7a-4f80-a20b-19984ce24070/image.png" width=130> |<img src="https://velog.velcdn.com/images/zhy2on/post/db65ba41-fb04-473c-bee7-455ee19ffa23/image.png" width=140> |
 |:---:|:---:|:---:|
 |오지현|김택우|송하준|
 |Infra / BE| BE | BE |
